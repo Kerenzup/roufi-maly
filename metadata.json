@@ -1,0 +1,7 @@
+{
+  "name": "Pinky POS",
+  "description": "Aplikasi Kasir POS & Manajemen Stok Multi-Cabang berfitur lengkap",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
