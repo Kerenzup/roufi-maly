@@ -17,18 +17,24 @@ let db = {
     diskonMemberPersen: 10,
     footerStruk: "Terima kasih telah berbelanja di Pinky Shop 🌸",
     rekeningOwner: [
+      { id: "bni", bank: "BNI", nomor: "2064972", atasNama: "ROUFI MALY", qrisUrl: "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=BNI-2064972" },
       { id: "bca", bank: "BCA", nomor: "1234567890", atasNama: "Ibu Boss Owner", qrisUrl: "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=BCA-1234567890" },
       { id: "mandiri", bank: "Mandiri", nomor: "0987654321", atasNama: "Ibu Boss Owner", qrisUrl: "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=Mandiri-0987654321" }
-    ]
+    ],
+    branchOpExpenses: {
+      "Cabang Pusat": { sewa: 5000000, listrik: 1500000, air: 300000, gaji: 15000000, telepon: 500000, transport: 1000000, csr: 500000 },
+      "Cabang Jakarta Selatan": { sewa: 7500000, listrik: 2200000, air: 450000, gaji: 18000000, telepon: 600000, transport: 1500000, csr: 750000 },
+      "Cabang Bandung": { sewa: 4000000, listrik: 1200000, air: 250000, gaji: 12000000, telepon: 400000, transport: 800000, csr: 450000 }
+    }
   },
   users: [
-    { email: "owner@usaha.com", sandi: "123456", nama: "Ibu Boss Owner", role: "Owner", cabang: "Semua Cabang" },
-    { email: "admin.pst@usaha.com", sandi: "123456", nama: "Admin Pusat", role: "Admin Cabang", cabang: "Cabang Pusat" },
-    { email: "admin.jkt@usaha.com", sandi: "123456", nama: "Admin JKT", role: "Admin Cabang", cabang: "Cabang Jakarta Selatan" },
-    { email: "admin.bdg@usaha.com", sandi: "123456", nama: "Admin BDG", role: "Admin Cabang", cabang: "Cabang Bandung" },
-    { email: "kasir.pst@usaha.com", sandi: "123456", nama: "Kasir Pusat", role: "Kasir", cabang: "Cabang Pusat" },
-    { email: "kasir.jkt@usaha.com", sandi: "123456", nama: "Kasir JKT", role: "Kasir", cabang: "Cabang Jakarta Selatan" },
-    { email: "kasir.bdg@usaha.com", sandi: "123456", nama: "Kasir BDG", role: "Kasir", cabang: "Cabang Bandung" }
+    { email: "owner@usaha.com", sandi: "123456", nama: "Ibu Boss Owner", role: "Owner", cabang: "Semua Cabang", komisiPersen: 0 },
+    { email: "admin.pst@usaha.com", sandi: "123456", nama: "Admin Pusat", role: "Admin Cabang", cabang: "Cabang Pusat", komisiPersen: 3 },
+    { email: "admin.jkt@usaha.com", sandi: "123456", nama: "Admin JKT", role: "Admin Cabang", cabang: "Cabang Jakarta Selatan", komisiPersen: 3 },
+    { email: "admin.bdg@usaha.com", sandi: "123456", nama: "Admin BDG", role: "Admin Cabang", cabang: "Cabang Bandung", komisiPersen: 3 },
+    { email: "kasir.pst@usaha.com", sandi: "123456", nama: "Kasir Pusat", role: "Kasir", cabang: "Cabang Pusat", komisiPersen: 5 },
+    { email: "kasir.jkt@usaha.com", sandi: "123456", nama: "Kasir JKT", role: "Kasir", cabang: "Cabang Jakarta Selatan", komisiPersen: 5 },
+    { email: "kasir.bdg@usaha.com", sandi: "123456", nama: "Kasir BDG", role: "Kasir", cabang: "Cabang Bandung", komisiPersen: 5 }
   ],
   cabang: [
     ["PST", "Cabang Pusat", "Jl. Merdeka No. 1 Jakarta"],
@@ -53,6 +59,22 @@ let db = {
   ],
   opname: [
     { timestamp: Date.now() - 86400000, cabang: "Cabang Pusat", kode: "BRG001", nama: "Blouse Pink Pastel", sistem: 26, fisik: 25, selisih: -1, ket: "Barang sample display" }
+  ],
+  transfer: [
+    { id: "TRF-171801", tanggal: Date.now() - 86400000, dariCabang: "Cabang Pusat", keCabang: "Cabang Bandung", kode: "BRG001", nama: "Blouse Pink Pastel", qty: 5, status: "Approved", pengaju: "Admin Pusat", catatan: "Restock etalase Bandung" }
+  ],
+  purchaseOrders: [
+    { id: "PO-9001", tanggal: Date.now() - 172800000, supplier: "PT Tekstil Makmur Jaya", cabang: "Cabang Pusat", items: [{ kode: "BRG001", nama: "Blouse Pink Pastel", qty: 50, hargaBeli: 70000 }], total: 3500000, status: "Received" }
+  ],
+  ledger: [
+    { id: "LED-001", tanggal: Date.now() - 3600000 * 2, akun: "Pendapatan Penjualan (Sales Revenue)", tipe: "Kredit", jumlah: 240000, cabang: "Cabang Pusat", referensi: "TXT-17180001" },
+    { id: "LED-002", tanggal: Date.now() - 3600000 * 2, akun: "Kas / QRIS Asset", tipe: "Debet", jumlah: 266400, cabang: "Cabang Pusat", referensi: "TXT-17180001" }
+  ],
+  payroll: [
+    { id: "PAY-101", periode: "Juni 2026", pegawai: "Kasir Pusat", cabang: "Cabang Pusat", gajiPokok: 3500000, komisi: 450000, totalTerima: 3950000, status: "Paid" }
+  ],
+  production: [
+    { id: "PRD-501", tanggal: Date.now() - 86400000, produk: "Blouse Pink Pastel", qtyProduksi: 30, bahanBaku: "Kain Katun Rayon Pink", qtyBahan: "15 Meter", status: "Completed", pic: "Supervisor Manufaktur" }
   ]
 };
 
@@ -120,13 +142,18 @@ app.get("/api/getAwal", (req, res) => {
     cabang: db.cabang,
     transaksi: db.transaksi,
     opname: db.opname,
+    transfer: db.transfer,
+    purchaseOrders: db.purchaseOrders,
+    ledger: db.ledger,
+    payroll: db.payroll,
+    production: db.production,
     settings: db.settings,
     users: db.users
   });
 });
 
 app.post("/api/updateSettings", (req, res) => {
-  const { namaToko, alamat, logoUrl, pajakPersen, diskonMemberPersen, footerStruk, rekeningOwner } = req.body;
+  const { namaToko, alamat, logoUrl, pajakPersen, diskonMemberPersen, footerStruk, rekeningOwner, branchOpExpenses } = req.body;
   db.settings = {
     namaToko: namaToko || db.settings.namaToko,
     alamat: alamat || db.settings.alamat,
@@ -134,9 +161,10 @@ app.post("/api/updateSettings", (req, res) => {
     pajakPersen: Number(pajakPersen) || 0,
     diskonMemberPersen: Number(diskonMemberPersen) || 0,
     footerStruk: footerStruk || db.settings.footerStruk,
-    rekeningOwner: rekeningOwner || db.settings.rekeningOwner
+    rekeningOwner: rekeningOwner || db.settings.rekeningOwner,
+    branchOpExpenses: branchOpExpenses || db.settings.branchOpExpenses
   };
-  res.json({ s: 1, m: "Pengaturan toko & rekening berhasil diperbarui!" });
+  res.json({ s: 1, m: "Pengaturan toko, rekening & biaya operasional per cabang berhasil diperbarui!" });
 });
 
 app.post("/api/simpanUser", (req, res) => {
@@ -149,7 +177,7 @@ app.post("/api/simpanUser", (req, res) => {
     existing.cabang = cabang || existing.cabang;
     res.json({ s: 1, m: "Data staff berhasil diperbarui!" });
   } else {
-    db.users.push({ email, sandi: sandi || "123456", nama: nama || "Staff Baru", role: role || "Kasir", cabang: cabang || "Cabang Pusat" });
+    db.users.push({ email, sandi: sandi || "123456", nama: nama || "Staff Baru", role: role || "Kasir", cabang: cabang || "Cabang Pusat", komisiPersen: 5 });
     res.json({ s: 1, m: "Staff baru berhasil ditambahkan!" });
   }
 });
@@ -161,7 +189,7 @@ app.post("/api/hapusUser", (req, res) => {
 });
 
 app.post("/api/simpanBarang", (req, res) => {
-  const { kode, nama, beli, hpp, jual, stok, foto, cabang, oldKode, branchStokMap } = req.body;
+  const { kode, nama, beli, hpp, jual, stok, foto, cabang, oldKode, branchStokMap, branchHppMap } = req.body;
   const baseKode = kode || `BRG${Date.now().toString().slice(-4)}`;
 
   if (oldKode && oldKode !== baseKode) {
@@ -175,11 +203,15 @@ app.post("/api/simpanBarang", (req, res) => {
       ? Number(branchStokMap[branchName]) 
       : (branchName === (cabang || "Cabang Pusat") && stok !== undefined && stok !== "" ? Number(stok) : (existing ? existing[6] : 10));
 
+    const branchHppVal = branchHppMap && branchHppMap[branchName] !== undefined
+      ? Number(branchHppMap[branchName])
+      : (branchName === (cabang || "Cabang Pusat") && hpp !== undefined && hpp !== "" ? Number(hpp) : (existing ? existing[4] : Number(hpp) || Number(beli) || 45000));
+
     if (existing) {
       existing[1] = baseKode;
       existing[2] = nama || existing[2];
       existing[3] = Number(beli) || existing[3];
-      existing[4] = Number(hpp) || Number(beli) || existing[4];
+      existing[4] = branchHppVal;
       existing[5] = Number(jual) || existing[5];
       existing[6] = branchStokVal;
       existing[7] = foto || existing[7];
@@ -189,7 +221,7 @@ app.post("/api/simpanBarang", (req, res) => {
         baseKode,
         nama || "Produk Baru",
         Number(beli) || 0,
-        Number(hpp) || Number(beli) || 0,
+        branchHppVal,
         Number(jual) || 0,
         branchStokVal,
         foto || "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=150",
@@ -198,7 +230,7 @@ app.post("/api/simpanBarang", (req, res) => {
     }
   });
 
-  res.json({ s: 1, m: "Barang berhasil disimpan & disesuaikan di setiap cabang!" });
+  res.json({ s: 1, m: "Barang berhasil disimpan & HPP serta stok disesuaikan per cabang!" });
 });
 
 app.post("/api/hapusBarang", (req, res) => {
@@ -259,6 +291,219 @@ app.post("/api/simpanOpname", (req, res) => {
   }
 
   res.json({ s: 1, m: "Stok Opname berhasil dikirim & stok disesuaikan!" });
+});
+
+app.post("/api/buatTransfer", (req, res) => {
+  const { dariCabang, keCabang, kode, nama, qty, catatan, pengaju } = req.body;
+  if (!dariCabang || !keCabang || !kode || !qty) {
+    return res.json({ s: 0, m: "Data transfer tidak lengkap!" });
+  }
+  const id = "TRF-" + Date.now().toString().slice(-6);
+  db.transfer.unshift({
+    id,
+    tanggal: Date.now(),
+    dariCabang,
+    keCabang,
+    kode,
+    nama: nama || "Produk",
+    qty: Number(qty) || 1,
+    status: "Pending",
+    pengaju: pengaju || "Staff Cabang",
+    catatan: catatan || "-"
+  });
+  res.json({ s: 1, m: "Permintaan transfer barang berhasil dikirim ke Pusat untuk approval!" });
+});
+
+app.post("/api/prosesTransfer", (req, res) => {
+  const { id, status } = req.body;
+  const transferItem = db.transfer.find((t: any) => t.id === id);
+  if (!transferItem) return res.json({ s: 0, m: "Data transfer tidak ditemukan." });
+
+  if (transferItem.status !== 'Pending') {
+    return res.json({ s: 0, m: "Transfer ini sudah diproses sebelumnya." });
+  }
+
+  transferItem.status = status;
+
+  if (status === 'Approved') {
+    const q = Number(transferItem.qty) || 1;
+    // Deduct from dariCabang
+    let sourceBarang = db.barang.find((b: any) => b[1] === transferItem.kode && (b[8] === transferItem.dariCabang || (!b[8] && transferItem.dariCabang === 'Cabang Pusat')));
+    if (sourceBarang) {
+      sourceBarang[6] = Math.max(0, Number(sourceBarang[6] || 0) - q);
+    } else {
+      const ref = db.barang.find((b: any) => b[1] === transferItem.kode);
+      db.barang.push([
+        db.barang.length + 1,
+        transferItem.kode,
+        transferItem.nama,
+        ref ? ref[3] : 50000,
+        ref ? ref[4] : 45000,
+        ref ? ref[5] : 100000,
+        0,
+        ref ? ref[7] : "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=150",
+        transferItem.dariCabang
+      ]);
+    }
+
+    // Add to keCabang
+    let destBarang = db.barang.find((b: any) => b[1] === transferItem.kode && (b[8] === transferItem.keCabang || (!b[8] && transferItem.keCabang === 'Cabang Pusat')));
+    if (destBarang) {
+      destBarang[6] = Number(destBarang[6] || 0) + q;
+    } else {
+      const ref = db.barang.find((b: any) => b[1] === transferItem.kode);
+      db.barang.push([
+        db.barang.length + 1,
+        transferItem.kode,
+        transferItem.nama,
+        ref ? ref[3] : 50000,
+        ref ? ref[4] : 45000,
+        ref ? ref[5] : 100000,
+        q,
+        ref ? ref[7] : "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=150",
+        transferItem.keCabang
+      ]);
+    }
+  }
+
+  res.json({ s: 1, m: `Transfer ${id} berhasil ${status === 'Approved' ? 'di-approve & stok berhasil dimutasi antar cabang' : 'ditolak'}!` });
+});
+
+// ERP Purchase Orders (Supply Chain Management)
+app.post("/api/buatPO", (req, res) => {
+  const { supplier, cabang, items, total } = req.body;
+  if (!supplier || !cabang || !items) return res.json({ s: 0, m: "Data Purchase Order tidak lengkap!" });
+  const id = "PO-" + Math.floor(1000 + Math.random() * 9000);
+  db.purchaseOrders.unshift({
+    id,
+    tanggal: Date.now(),
+    supplier,
+    cabang,
+    items,
+    total: Number(total) || 0,
+    status: "Pending"
+  });
+
+  // Ledger entry for PO liability / expense draft
+  db.ledger.unshift({
+    id: "LED-" + Date.now().toString().slice(-5),
+    tanggal: Date.now(),
+    akun: "Hutang Usaha / Pembelian (Accounts Payable)",
+    tipe: "Kredit",
+    jumlah: Number(total) || 0,
+    cabang,
+    referensi: id
+  });
+
+  res.json({ s: 1, m: `Purchase Order ${id} berhasil diajukan ke supplier ${supplier}!` });
+});
+
+app.post("/api/prosesPO", (req, res) => {
+  const { id, status } = req.body;
+  const po = db.purchaseOrders.find((p: any) => p.id === id);
+  if (!po) return res.json({ s: 0, m: "Purchase Order tidak ditemukan." });
+
+  po.status = status;
+  if (status === 'Received') {
+    // Add stock to branch
+    po.items.forEach((item: any) => {
+      let b = db.barang.find((x: any) => x[1] === item.kode && x[8] === po.cabang);
+      if (b) {
+        b[6] = Number(b[6]) + Number(item.qty);
+      } else {
+        db.barang.push([
+          db.barang.length + 1,
+          item.kode,
+          item.nama,
+          item.hargaBeli || 50000,
+          item.hargaBeli ? item.hargaBeli - 5000 : 45000,
+          item.hargaBeli ? item.hargaBeli * 1.5 : 100000,
+          Number(item.qty),
+          "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=150",
+          po.cabang
+        ]);
+      }
+    });
+
+    db.ledger.unshift({
+      id: "LED-" + Date.now().toString().slice(-5),
+      tanggal: Date.now(),
+      akun: "Persediaan Barang Masuk (Inventory Asset)",
+      tipe: "Debet",
+      jumlah: po.total,
+      cabang: po.cabang,
+      referensi: id
+    });
+  }
+
+  res.json({ s: 1, m: `Purchase Order ${id} berhasil diperbarui statusnya menjadi ${status} & stok otomatis diperbarui!` });
+});
+
+// ERP HR & Payroll Management
+app.post("/api/updateUserCommission", (req, res) => {
+  const { email, komisiPersen } = req.body;
+  const targetUser = db.users.find((u: any) => u.email === email);
+  if (!targetUser) return res.json({ s: 0, m: "Pegawai tidak ditemukan." });
+  targetUser.komisiPersen = Number(komisiPersen) || 0;
+  res.json({ s: 1, m: `Persentase komisi untuk ${targetUser.nama} berhasil diatur menjadi ${targetUser.komisiPersen}% oleh Owner!` });
+});
+
+app.post("/api/buatPayroll", (req, res) => {
+  const { periode, pegawai, cabang, gajiPokok, komisi } = req.body;
+  if (!pegawai || !gajiPokok) return res.json({ s: 0, m: "Data payroll tidak lengkap!" });
+  const id = "PAY-" + Math.floor(100 + Math.random() * 900);
+  const gp = Number(gajiPokok) || 0;
+  const km = Number(komisi) || 0;
+  const totalTerima = gp + km;
+
+  db.payroll.unshift({
+    id,
+    periode: periode || "Bulan Ini",
+    pegawai,
+    cabang: cabang || "Cabang Pusat",
+    gajiPokok: gp,
+    komisi: km,
+    totalTerima,
+    status: "Paid"
+  });
+
+  db.ledger.unshift({
+    id: "LED-" + Date.now().toString().slice(-5),
+    tanggal: Date.now(),
+    akun: "Beban Gaji & Komisi SDM (HR Expense)",
+    tipe: "Debet",
+    jumlah: totalTerima,
+    cabang: cabang || "Cabang Pusat",
+    referensi: id
+  });
+
+  res.json({ s: 1, m: `Payroll & komisi untuk ${pegawai} berhasil diproses & dicatat dalam buku besar!` });
+});
+
+// ERP Manufacturing / Production (Bill of Materials)
+app.post("/api/buatProduksi", (req, res) => {
+  const { produk, qtyProduksi, bahanBaku, qtyBahan, pic } = req.body;
+  if (!produk || !qtyProduksi) return res.json({ s: 0, m: "Data produksi tidak lengkap!" });
+  const id = "PRD-" + Math.floor(100 + Math.random() * 900);
+  
+  db.production.unshift({
+    id,
+    tanggal: Date.now(),
+    produk,
+    qtyProduksi: Number(qtyProduksi) || 1,
+    bahanBaku: bahanBaku || "Kain / Bahan Baku Utama",
+    qtyBahan: qtyBahan || "Standar",
+    status: "Completed",
+    pic: pic || "Supervisor Produksi"
+  });
+
+  // Add finished goods to Cabang Pusat
+  let b = db.barang.find((x: any) => x[2] === produk && x[8] === "Cabang Pusat");
+  if (b) {
+    b[6] = Number(b[6]) + Number(qtyProduksi);
+  }
+
+  res.json({ s: 1, m: `Work Order Produksi ${id} selesai! ${qtyProduksi} pcs ${produk} telah ditambahkan ke stok Cabang Pusat.` });
 });
 
 async function startServer() {
