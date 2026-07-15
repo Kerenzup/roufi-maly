@@ -12,6 +12,8 @@ let db = {
   settings: {
     namaToko: "PINKY SHOP",
     alamat: "Jl. Pink Utama No. 88 Jakarta",
+    alamatPo: "Jl. Pink Utama No. 88 Jakarta (Kantor Pusat)",
+    theme: "sakura",
     logoUrl: "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=300",
     pajakPersen: 11,
     diskonMemberPersen: 10,
@@ -153,10 +155,12 @@ app.get("/api/getAwal", (req, res) => {
 });
 
 app.post("/api/updateSettings", (req, res) => {
-  const { namaToko, alamat, logoUrl, pajakPersen, diskonMemberPersen, footerStruk, rekeningOwner, branchOpExpenses } = req.body;
+  const { namaToko, alamat, alamatPo, theme, logoUrl, pajakPersen, diskonMemberPersen, footerStruk, rekeningOwner, branchOpExpenses } = req.body;
   db.settings = {
     namaToko: namaToko || db.settings.namaToko,
     alamat: alamat || db.settings.alamat,
+    alamatPo: alamatPo !== undefined ? alamatPo : db.settings.alamatPo,
+    theme: theme || db.settings.theme,
     logoUrl: logoUrl || db.settings.logoUrl,
     pajakPersen: Number(pajakPersen) || 0,
     diskonMemberPersen: Number(diskonMemberPersen) || 0,
@@ -294,10 +298,12 @@ app.post("/api/simpanOpname", (req, res) => {
 });
 
 app.post("/api/buatTransfer", (req, res) => {
-  const { dariCabang, keCabang, kode, nama, qty, catatan, pengaju } = req.body;
+  let { dariCabang, keCabang, kode, nama, qty, catatan, pengaju } = req.body;
   if (!dariCabang || !keCabang || !kode || !qty) {
     return res.json({ s: 0, m: "Data transfer tidak lengkap!" });
   }
+  if (dariCabang === 'Pusat') dariCabang = 'Cabang Pusat';
+  if (keCabang === 'Pusat') keCabang = 'Cabang Pusat';
   const id = "TRF-" + Date.now().toString().slice(-6);
   db.transfer.unshift({
     id,
@@ -322,6 +328,9 @@ app.post("/api/prosesTransfer", (req, res) => {
   if (transferItem.status !== 'Pending') {
     return res.json({ s: 0, m: "Transfer ini sudah diproses sebelumnya." });
   }
+
+  if (transferItem.dariCabang === 'Pusat') transferItem.dariCabang = 'Cabang Pusat';
+  if (transferItem.keCabang === 'Pusat') transferItem.keCabang = 'Cabang Pusat';
 
   transferItem.status = status;
 

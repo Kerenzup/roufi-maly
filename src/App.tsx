@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { 
   ShoppingCart, 
   Package, 
@@ -30,7 +31,9 @@ import {
   BookOpen,
   Truck,
   Wallet,
-  Factory
+  Factory,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 function generateQrisPayload(bank: string, nomor: string, atasNama: string, amount: number): string {
@@ -84,6 +87,18 @@ function generateQrisPayload(bank: string, nomor: string, atasNama: string, amou
   return partial + hex;
 }
 
+function formatNumberWithDots(num: number | string): string {
+  if (num === undefined || num === null || num === '') return '';
+  const clean = String(num).replace(/[^0-9]/g, '');
+  if (!clean) return '';
+  return Number(clean).toLocaleString('id-ID');
+}
+
+function parseNumberFromDots(str: string): number {
+  const clean = String(str).replace(/[^0-9]/g, '');
+  return clean ? Number(clean) : 0;
+}
+
 interface User {
   email: string;
   nama: string;
@@ -109,10 +124,116 @@ interface Rekening {
   qrisUrl: string;
 }
 
+export const THEMES = [
+  {
+    id: "sakura",
+    nama: "🌸 Sakura Blossom (Pink - Default)",
+    primary: "#ff3377",
+    primaryHover: "#ff1a5c",
+    secondary: "#ff6699",
+    secondaryHover: "#ff4d80",
+    bg: "#fff0f5",
+    lightTint: "#ffe4e1",
+    borderTint: "#fbcfe8",
+    textColor: "#ff3377",
+    glow: "rgba(255, 51, 119, 0.15)",
+    sidebarBg: "#ff6699",
+  },
+  {
+    id: "emerald",
+    nama: "🌲 Emerald Garden (Hijau Corporate)",
+    primary: "#059669",
+    primaryHover: "#047857",
+    secondary: "#10b981",
+    secondaryHover: "#059669",
+    bg: "#f0fdf4",
+    lightTint: "#dcfce7",
+    borderTint: "#a7f3d0",
+    textColor: "#059669",
+    glow: "rgba(5, 150, 105, 0.15)",
+    sidebarBg: "#10b981",
+  },
+  {
+    id: "ocean",
+    nama: "💙 Royal Ocean (Biru Navy & Sky)",
+    primary: "#1d4ed8",
+    primaryHover: "#1e40af",
+    secondary: "#3b82f6",
+    secondaryHover: "#2563eb",
+    bg: "#f0f6ff",
+    lightTint: "#dbeafe",
+    borderTint: "#bfdbfe",
+    textColor: "#1d4ed8",
+    glow: "rgba(29, 78, 216, 0.15)",
+    sidebarBg: "#3b82f6",
+  },
+  {
+    id: "amethyst",
+    nama: "🍇 Amethyst Lavender (Ungu Elegan)",
+    primary: "#7c3aed",
+    primaryHover: "#6d28d9",
+    secondary: "#8b5cf6",
+    secondaryHover: "#7c3aed",
+    bg: "#f5f3ff",
+    lightTint: "#ede9fe",
+    borderTint: "#ddd6fe",
+    textColor: "#7c3aed",
+    glow: "rgba(124, 58, 237, 0.15)",
+    sidebarBg: "#8b5cf6",
+  },
+  {
+    id: "sunset",
+    nama: "🍊 Tangerine Sunset (Orange Fresh)",
+    primary: "#ea580c",
+    primaryHover: "#c2410c",
+    secondary: "#f97316",
+    secondaryHover: "#ea580c",
+    bg: "#fff7ed",
+    lightTint: "#ffedd5",
+    borderTint: "#fed7aa",
+    textColor: "#ea580c",
+    glow: "rgba(234, 88, 12, 0.15)",
+    sidebarBg: "#f97316",
+  },
+  {
+    id: "carbon",
+    nama: "🕶️ Carbon Tech (Modern Slate/Black)",
+    primary: "#111827",
+    primaryHover: "#1f2937",
+    secondary: "#4b5563",
+    secondaryHover: "#374151",
+    bg: "#f9fafb",
+    lightTint: "#f3f4f6",
+    borderTint: "#e5e7eb",
+    textColor: "#111827",
+    glow: "rgba(17, 24, 39, 0.15)",
+    sidebarBg: "#4b5563",
+  }
+];
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'pos' | 'barang' | 'opname' | 'laporan' | 'audit' | 'cabang' | 'staff' | 'settings' | 'panduan' | 'transfer' | 'erp' | 'ledger' | 'po' | 'payroll' | 'production'>('pos');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  
+  const [settings, setSettings] = useState({
+    namaToko: "PINKY SHOP",
+    alamat: "Jl. Pink Utama No. 88 Jakarta",
+    alamatPo: "Jl. Pink Utama No. 88 Jakarta (Kantor Pusat)",
+    theme: "sakura",
+    logoUrl: "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=300",
+    pajakPersen: 11,
+    diskonMemberPersen: 10,
+    footerStruk: "Terima kasih telah berbelanja di Pinky Shop 🌸",
+    rekeningOwner: [
+      { id: "bni", bank: "BNI", nomor: "2064972", atasNama: "ROUFI MALY", qrisUrl: "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=BNI-2064972" },
+      { id: "bca", bank: "BCA", nomor: "1234567890", atasNama: "Ibu Boss Owner", qrisUrl: "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=BCA-1234567890" },
+      { id: "mandiri", bank: "Mandiri", nomor: "0987654321", atasNama: "Ibu Boss Owner", qrisUrl: "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=Mandiri-0987654321" }
+    ] as Rekening[]
+  });
+
+  const currentTheme = THEMES.find(t => t.id === (settings.theme || 'sakura')) || THEMES[0];
   
   // Login form state
   const [emailInput, setEmailInput] = useState('owner@usaha.com');
@@ -158,23 +279,12 @@ export default function App() {
     "Cabang Bandung": { sewa: 4000000, listrik: 1200000, air: 250000, gaji: 12000000, telepon: 400000, transport: 800000, csr: 450000 }
   });
   const [selectedOpBranch, setSelectedOpBranch] = useState<string>("Cabang Pusat");
-  const [settings, setSettings] = useState({
-    namaToko: "PINKY SHOP",
-    alamat: "Jl. Pink Utama No. 88 Jakarta",
-    logoUrl: "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=300",
-    pajakPersen: 11,
-    diskonMemberPersen: 10,
-    footerStruk: "Terima kasih telah berbelanja di Pinky Shop 🌸",
-    rekeningOwner: [
-      { id: "bni", bank: "BNI", nomor: "2064972", atasNama: "ROUFI MALY", qrisUrl: "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=BNI-2064972" },
-      { id: "bca", bank: "BCA", nomor: "1234567890", atasNama: "Ibu Boss Owner", qrisUrl: "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=BCA-1234567890" },
-      { id: "mandiri", bank: "Mandiri", nomor: "0987654321", atasNama: "Ibu Boss Owner", qrisUrl: "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=Mandiri-0987654321" }
-    ] as Rekening[]
-  });
 
   // Settings form state
   const [setNamaToko, setSetNamaToko] = useState('');
   const [setAlamat, setSetAlamat] = useState('');
+  const [setAlamatPo, setSetAlamatPo] = useState('');
+  const [setTheme, setSetTheme] = useState('sakura');
   const [setLogoUrl, setSetLogoUrl] = useState('');
   const [setPajak, setSetPajak] = useState('');
   const [setDiskonMember, setSetDiskonMember] = useState('');
@@ -239,13 +349,466 @@ export default function App() {
   const [trfQty, setTrfQty] = useState('');
   const [trfCatatan, setTrfCatatan] = useState('');
 
+  // Custom Confirmation Dialog State
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'delete_barang' | 'delete_branch' | 'delete_staff' | 'process_po' | 'process_transfer' | null;
+    payload: any;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: null,
+    payload: null
+  });
+
+  const triggerConfirm = (
+    title: string, 
+    message: string, 
+    type: 'delete_barang' | 'delete_branch' | 'delete_staff' | 'process_po' | 'process_transfer',
+    payload: any
+  ) => {
+    setConfirmDialog({
+      isOpen: true,
+      title,
+      message,
+      type,
+      payload
+    });
+  };
+
+  const handleConfirmAction = async () => {
+    if (!confirmDialog.type) return;
+    const { type, payload } = confirmDialog;
+    setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+
+    try {
+      if (type === 'delete_barang') {
+        const res = await fetch('/api/hapusBarang', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ kode: payload.kode })
+        });
+        const data = await res.json();
+        alert(data.m);
+        fetchData();
+      } else if (type === 'delete_branch') {
+        const res = await fetch('/api/hapusCabang', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: payload.id })
+        });
+        const data = await res.json();
+        alert(data.m);
+        fetchData();
+      } else if (type === 'delete_staff') {
+        const res = await fetch('/api/hapusUser', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: payload.email })
+        });
+        const data = await res.json();
+        alert(data.m);
+        fetchData();
+      } else if (type === 'process_po') {
+        const res = await fetch('/api/prosesPO', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: payload.id, status: payload.status })
+        });
+        const data = await res.json();
+        alert(data.m);
+        fetchData();
+      } else if (type === 'process_transfer') {
+        const res = await fetch('/api/prosesTransfer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: payload.id, status: payload.status })
+        });
+        const data = await res.json();
+        try {
+          alert(data.m);
+        } catch (alertErr) {
+          console.warn("window.alert is blocked/unavailable.", alertErr);
+        }
+        fetchData();
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Gagal memproses tindakan");
+    }
+  };
+
+  const [showValuasiModal, setShowValuasiModal] = useState(false);
+  const [selectedPoForSuratJalan, setSelectedPoForSuratJalan] = useState<any | null>(null);
+
+  const handlePrintSuratJalan = () => {
+    window.print();
+  };
+
+  const handleDownloadSuratJalanHTML = () => {
+    if (!selectedPoForSuratJalan) return;
+    
+    const po = selectedPoForSuratJalan;
+    const storeName = settings.namaToko || "PINKY POS & BOUTIQUE";
+    const storeAddress = settings.alamatPo || settings.alamat || "Jl. Merdeka No. 45, Kebayoran Baru, Jakarta Selatan";
+    const storeLogoHtml = settings.logoUrl 
+      ? `<img src="${settings.logoUrl}" alt="Logo Toko" style="width: 64px; height: 64px; object-fit: cover; border-radius: 12px; border: 1px solid #fbcfe8; flex-shrink: 0;" />`
+      : '';
+
+    const itemsHtml = po.items.map((it: any, idx: number) => `
+      <tr style="border-bottom: 1px solid #d1d5db;">
+        <td style="padding: 10px; text-align: center; border-right: 1px solid #d1d5db;">${idx + 1}</td>
+        <td style="padding: 10px; font-weight: bold; border-right: 1px solid #d1d5db; color: #111827;">${it.nama}</td>
+        <td style="padding: 10px; text-align: center; font-weight: 900; border-right: 1px solid #d1d5db; color: #111827;">${it.qty}</td>
+        <td style="padding: 10px; text-align: center; border-right: 1px solid #d1d5db;">Pcs</td>
+        <td style="padding: 10px; text-align: right; border-right: 1px solid #d1d5db; color: #111827;">Rp ${(it.hargaBeli || 0).toLocaleString('id-ID')}</td>
+        <td style="padding: 10px; text-align: right; color: #111827; font-weight: bold;">Rp ${((it.qty || 0) * (it.hargaBeli || 0)).toLocaleString('id-ID')}</td>
+      </tr>
+    `).join('');
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Purchase Order - PO-${po.id}</title>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+          <style>
+            @media print {
+              body {
+                padding: 0;
+                margin: 0;
+                background-color: white;
+              }
+              .no-print {
+                display: none !important;
+              }
+              .paper-border {
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+              }
+            }
+            body {
+              font-family: system-ui, -apple-system, sans-serif;
+              background-color: #f3f4f6;
+              padding: 2rem 1rem;
+              color: #1f2937;
+            }
+          </style>
+        </head>
+        <body class="flex flex-col items-center justify-start min-h-screen">
+          <!-- Control Panel banner (Hidden on print) -->
+          <div class="no-print bg-gradient-to-r from-pink-500 to-pink-600 text-white px-6 py-4 rounded-2xl shadow-xl mb-6 w-full max-w-4xl flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div>
+              <h3 class="font-bold text-lg">📄 Purchase Order (PO) Siap Cetak (PO-${po.id})</h3>
+              <p class="text-xs text-pink-100 mt-1">Dokumen pemesanan resmi dari ${storeName}. Klik tombol untuk mencetak atau mengunduh sebagai PDF.</p>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="window.print()" class="px-5 py-2.5 bg-white text-pink-600 font-bold text-sm rounded-xl shadow hover:bg-pink-50 transition-all cursor-pointer">
+                🖨️ Cetak / Simpan PDF
+              </button>
+              <button onclick="window.close()" class="px-4 py-2.5 bg-pink-700 text-white font-medium text-sm rounded-xl hover:bg-pink-800 transition-all cursor-pointer">
+                Tutup Halaman
+              </button>
+            </div>
+          </div>
+
+          <!-- Document Paper -->
+          <div class="paper-border bg-white border-2 border-gray-300 p-8 rounded-2xl shadow-lg w-full max-w-4xl text-gray-800">
+            <!-- Paper Header -->
+            <div class="flex flex-col md:flex-row justify-between items-start border-b-4 border-double border-gray-800 pb-4 mb-6 gap-4" style="border-bottom: 4px double #1f2937; padding-bottom: 1rem; margin-bottom: 1.5rem;">
+              <div style="display: flex; gap: 1rem; align-items: center;">
+                ${storeLogoHtml}
+                <div>
+                  <h2 class="text-2xl font-black text-gray-900 tracking-tight uppercase" style="font-weight: 900; font-size: 1.5rem; margin: 0;">
+                    ${storeName}
+                  </h2>
+                  <p class="text-xs font-semibold text-pink-600 uppercase tracking-widest mt-0.5" style="font-size: 0.75rem; letter-spacing: 0.1em; color: #db2777; font-weight: 600; margin: 0;">Fashion, Retail & Supply Chain Management</p>
+                  <p class="text-xs text-gray-500 mt-1 max-w-md" style="font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem;">${storeAddress}</p>
+                </div>
+              </div>
+              <div class="md:text-right" style="text-align: right;">
+                <h3 class="text-xl font-bold text-gray-900 tracking-wider" style="font-size: 1.25rem; font-weight: 700; margin: 0;">PURCHASE ORDER (PO)</h3>
+                <p class="text-xs text-gray-400 font-mono uppercase" style="font-size: 0.75rem; color: #9ca3af; font-family: monospace; margin: 0;">SURAT PESANAN BARANG</p>
+                <div class="mt-3 text-xs" style="font-size: 0.75rem; margin-top: 0.75rem;">
+                  <p style="margin: 2px 0;"><span style="color: #6b7280;">Nomor Dokumen:</span> <b style="color: #111827; font-family: monospace;">PO-${po.id}</b></p>
+                  <p style="margin: 2px 0;"><span style="color: #6b7280;">Tanggal PO:</span> <b style="color: #111827;">${new Date(po.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</b></p>
+                  <p style="margin: 2px 0;"><span style="color: #6b7280;">Metode Pengiriman:</span> <b style="color: #111827;">Kurir / Expedisi Rekanan</b></p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Buyer & Supplier Info -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 text-xs" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+              <div class="p-4 bg-gray-50 rounded-xl border border-gray-200" style="background-color: #f9fafb; padding: 1rem; border-radius: 12px; border: 1px solid #e5e7eb;">
+                <span class="text-gray-500 uppercase font-semibold tracking-wider block mb-1.5" style="color: #6b7280; font-weight: 600; display: block; margin-bottom: 0.5rem;">PEMESAN (BUYER):</span>
+                <p class="font-bold text-sm text-gray-900" style="font-size: 0.875rem; font-weight: 700; color: #111827;">${storeName}</p>
+                <p class="text-gray-500 mt-1" style="color: #6b7280; margin-top: 0.25rem;">Pembuat Pesanan Resmi</p>
+                <p class="text-gray-400 mt-2" style="color: #9ca3af; margin-top: 0.5rem; font-size: 0.75rem;">Lokasi Tujuan Pengiriman: <b>${po.cabang}</b></p>
+              </div>
+              <div class="p-4 bg-gray-50 rounded-xl border border-gray-200" style="background-color: #f9fafb; padding: 1rem; border-radius: 12px; border: 1px solid #e5e7eb;">
+                <span class="text-gray-500 uppercase font-semibold tracking-wider block mb-1.5" style="color: #6b7280; font-weight: 600; display: block; margin-bottom: 0.5rem;">PENYEDIA (SUPPLIER):</span>
+                <p class="font-bold text-sm text-gray-900" style="font-size: 0.875rem; font-weight: 700; color: #111827;">${po.supplier}</p>
+                <p class="text-gray-500 mt-1" style="color: #6b7280; margin-top: 0.25rem;">Mitra Penyedia & Rekanan Eksternal</p>
+                <p class="text-gray-500" style="color: #6b7280; font-size: 0.75rem;">Harap memproses pesanan sesuai dengan harga disepakati di bawah ini.</p>
+              </div>
+            </div>
+
+            <!-- Message -->
+            <p class="text-xs text-gray-600 mb-4 italic leading-relaxed" style="font-size: 0.75rem; color: #4b5563; font-style: italic; margin-bottom: 1rem;">
+              Bersama surat ini, kami mengirimkan Purchase Order resmi (Surat Pesanan) untuk pemesanan barang sediaan (stock) dengan rincian kuantitas, spesifikasi, dan harga yang disepakati sebagai berikut:
+            </p>
+
+            <!-- Table of Items -->
+            <div class="overflow-x-auto mb-6" style="margin-bottom: 1.5rem; overflow-x: auto;">
+              <table class="w-full text-left text-xs border border-gray-300" style="width: 100%; border-collapse: collapse; border: 1px solid #d1d5db; font-size: 0.75rem;">
+                <thead>
+                  <tr class="bg-gray-100 text-gray-700 font-bold border-b border-gray-300 uppercase" style="background-color: #f3f4f6; color: #374151; font-weight: bold; text-transform: uppercase;">
+                    <th style="padding: 10px; text-align: center; border-right: 1px solid #d1d5db; border-bottom: 1px solid #d1d5db; width: 50px;">No</th>
+                    <th style="padding: 10px; border-right: 1px solid #d1d5db; border-bottom: 1px solid #d1d5db; text-align: left;">Deskripsi / Nama Produk</th>
+                    <th style="padding: 10px; text-align: center; border-right: 1px solid #d1d5db; border-bottom: 1px solid #d1d5db; width: 100px;">Jumlah (Qty)</th>
+                    <th style="padding: 10px; text-align: center; border-right: 1px solid #d1d5db; border-bottom: 1px solid #d1d5db; width: 80px;">Satuan</th>
+                    <th style="padding: 10px; text-align: right; border-right: 1px solid #d1d5db; border-bottom: 1px solid #d1d5db; width: 140px;">Harga Satuan</th>
+                    <th style="padding: 10px; text-align: right; border-bottom: 1px solid #d1d5db; width: 150px;">Jumlah Harga</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${itemsHtml}
+                  <tr style="border-top: 2px solid #1f2937; font-weight: bold; background-color: #f9fafb;">
+                    <td colspan="5" style="padding: 10px; text-align: right; border-right: 1px solid #d1d5db; font-weight: bold;">TOTAL NILAI PESANAN (ESTIMASI):</td>
+                    <td style="padding: 10px; text-align: right; color: #db2777; font-size: 0.875rem; font-weight: 900;">Rp ${(po.total || 0).toLocaleString('id-ID')}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Terms / Notes -->
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-[11px] text-gray-500 mb-8 leading-relaxed" style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 0.75rem; font-size: 11px; color: #6b7280; margin-bottom: 2rem;">
+              <p class="font-bold mb-1 text-gray-700" style="font-weight: 700; color: #374151; margin-bottom: 0.25rem;">📌 Syarat & Ketentuan Pemesanan (Purchase Order):</p>
+              <ol class="list-decimal pl-4 space-y-0.5" style="list-style-type: decimal; padding-left: 1rem; margin: 0;">
+                <li>Mohon berikan konfirmasi kesiapan barang dan estimasi tanggal pengiriman setelah menerima lembar PO resmi ini.</li>
+                <li>Seluruh produk yang dikirimkan wajib dalam kondisi fisik prima, baru, lolos QC, serta sesuai spesifikasi deskripsi di atas.</li>
+                <li>Lampirkan dokumen Surat Jalan pengiriman fisik dari Supplier dengan mencantumkan nomor referensi <b>PO-${po.id}</b> ini.</li>
+              </ol>
+            </div>
+
+            <!-- Signatures -->
+            <div class="grid grid-cols-3 gap-4 text-center text-xs mt-6 pt-4 border-t border-dashed border-gray-300" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px dashed #d1d5db; text-align: center;">
+              <div class="flex flex-col justify-between h-28" style="display: flex; flex-direction: column; justify-content: space-between; height: 112px;">
+                <div>
+                  <p class="font-semibold text-gray-500 uppercase tracking-wider text-[10px]" style="font-weight: 600; color: #6b7280; font-size: 10px; text-transform: uppercase;">PEMBELI / PEMESAN</p>
+                  <p class="text-gray-400 text-[10px] italic mt-0.5" style="color: #9ca3af; font-size: 10px; font-style: italic;">(Staf / Admin Cabang)</p>
+                </div>
+                <div>
+                  <p class="font-bold border-t border-gray-300 pt-1.5 text-gray-900" style="font-weight: 700; border-top: 1px solid #e5e7eb; padding-top: 6px; color: #111827; margin: 0;">${user?.nama || 'Staff Pembeli'}</p>
+                  <p class="text-[10px] text-gray-400 font-mono" style="font-size: 10px; color: #9ca3af; font-family: monospace; margin: 0;">Tgl: .../ .../ ......</p>
+                </div>
+              </div>
+              <div class="flex flex-col justify-between h-28" style="display: flex; flex-direction: column; justify-content: space-between; height: 112px;">
+                <div>
+                  <p class="font-semibold text-gray-500 uppercase tracking-wider text-[10px]" style="font-weight: 600; color: #6b7280; font-size: 10px; text-transform: uppercase;">SUPPLIER / REKANAN</p>
+                  <p class="text-gray-400 text-[10px] italic mt-0.5" style="color: #9ca3af; font-size: 10px; font-style: italic;">(Konfirmasi Penerimaan PO)</p>
+                </div>
+                <div>
+                  <p class="font-bold border-t border-gray-300 pt-1.5 text-gray-900" style="font-weight: 700; border-top: 1px solid #e5e7eb; padding-top: 6px; color: #111827; margin: 0;">_________________</p>
+                  <p class="text-[10px] text-gray-400 font-mono" style="font-size: 10px; color: #9ca3af; font-family: monospace; margin: 0;">Tgl: .../ .../ ......</p>
+                </div>
+              </div>
+              <div class="flex flex-col justify-between h-28" style="display: flex; flex-direction: column; justify-content: space-between; height: 112px;">
+                <div>
+                  <p class="font-semibold text-gray-500 uppercase tracking-wider text-[10px]" style="font-weight: 600; color: #6b7280; font-size: 10px; text-transform: uppercase;">MENGETAHUI / MENYETUJUI</p>
+                  <p class="text-gray-400 text-[10px] italic mt-0.5" style="color: #9ca3af; font-size: 10px; font-style: italic;">(Owner / Manajemen Pusat)</p>
+                </div>
+                <div>
+                  <p class="font-bold border-t border-gray-300 pt-1.5 text-[#ff3377]" style="font-weight: 700; border-top: 1px solid #e5e7eb; padding-top: 6px; color: #db2777; margin: 0;">Owner / Pusat</p>
+                  <p class="text-[10px] text-gray-400 font-mono" style="font-size: 10px; color: #9ca3af; font-family: monospace; margin: 0;">Verified System ✅</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <script>
+            // Automatically focus and prompt print on load
+            window.onload = function() {
+              window.focus();
+              setTimeout(function() {
+                window.print();
+              }, 400);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Purchase_Order_PO-${po.id}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const renderSuratJalanPaper = (po: any) => {
+    if (!po) return null;
+    return (
+      <div className="bg-white border-2 border-gray-300 p-6 rounded-xl text-gray-800">
+        {/* Paper Header */}
+        <div className="flex flex-col md:flex-row justify-between items-start border-b-4 border-double border-gray-800 pb-4 mb-6 gap-4">
+          <div className="flex gap-4 items-center">
+            {settings.logoUrl && (
+              <img 
+                src={settings.logoUrl} 
+                alt="Logo Toko" 
+                className="w-16 h-16 object-cover rounded-xl border border-pink-200 shrink-0" 
+                referrerPolicy="no-referrer" 
+              />
+            )}
+            <div>
+              <h2 className="text-2xl font-black text-gray-900 tracking-tight uppercase">
+                {settings.namaToko || "PINKY POS & BOUTIQUE"}
+              </h2>
+              <p className="text-xs font-semibold text-pink-600 uppercase tracking-widest mt-0.5">Fashion, Retail & Supply Chain Management</p>
+              <p className="text-xs text-gray-500 mt-1 max-w-md">{settings.alamatPo || settings.alamat || "Jl. Merdeka No. 45, Kebayoran Baru, Jakarta Selatan"}</p>
+            </div>
+          </div>
+          <div className="md:text-right">
+            <h3 className="text-xl font-bold text-gray-900 tracking-wider">PURCHASE ORDER (PO)</h3>
+            <p className="text-xs text-gray-400 font-mono uppercase">SURAT PESANAN BARANG</p>
+            <div className="mt-3 text-xs space-y-1">
+              <p><span className="text-gray-500">Nomor Dokumen:</span> <b className="font-mono text-gray-900">PO-{po.id}</b></p>
+              <p><span className="text-gray-500">Tanggal PO:</span> <b className="text-gray-900">{new Date(po.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</b></p>
+              <p><span className="text-gray-500">Metode Kirim:</span> <b className="text-gray-900">Kurir / Expedisi</b></p>
+            </div>
+          </div>
+        </div>
+
+        {/* Sender & Receiver Info */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 text-xs">
+          <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <span className="text-gray-500 uppercase font-semibold tracking-wider block mb-1.5">PEMESAN (BUYER):</span>
+            <p className="font-bold text-sm text-gray-900">{settings.namaToko || "PINKY POS & BOUTIQUE"}</p>
+            <p className="text-gray-500 mt-1">Pembuat Pesanan Resmi</p>
+            <p className="text-gray-400 mt-2">Tujuan Pengiriman: <b>{po.cabang}</b></p>
+          </div>
+          <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <span className="text-gray-500 uppercase font-semibold tracking-wider block mb-1.5">PENYEDIA (SUPPLIER):</span>
+            <p className="font-bold text-sm text-gray-900">{po.supplier}</p>
+            <p className="text-gray-500 mt-1">Mitra Penyedia & Rekanan Eksternal</p>
+            <p className="text-gray-400 mt-2">Harap proses pesanan sesuai sediaan barang & kuantitas yang disepakati.</p>
+          </div>
+        </div>
+
+        {/* Message */}
+        <p className="text-xs text-gray-600 mb-4 italic leading-relaxed">
+          Bersama surat ini, kami mengirimkan Purchase Order resmi (Surat Pesanan) untuk pemesanan barang sediaan (stock) dengan rincian kuantitas, spesifikasi, dan harga yang disepakati sebagai berikut:
+        </p>
+
+        {/* Table of Items */}
+        <div className="overflow-x-auto mb-6">
+          <table className="w-full text-left text-xs border border-gray-300">
+            <thead>
+              <tr className="bg-gray-100 text-gray-700 font-bold border-b border-gray-300 uppercase">
+                <th className="p-2.5 text-center border-r border-gray-300 w-12">No</th>
+                <th className="p-2.5 border-r border-gray-300">Deskripsi / Nama Produk</th>
+                <th className="p-2.5 text-center border-r border-gray-300 w-24">Jumlah (Qty)</th>
+                <th className="p-2.5 text-center border-r border-gray-300 w-20">Satuan</th>
+                <th className="p-2.5 text-right border-r border-gray-300 w-32">Harga Satuan</th>
+                <th className="p-2.5 text-right">Jumlah Harga</th>
+              </tr>
+            </thead>
+            <tbody>
+              {po.items.map((it: any, idx: number) => (
+                <tr key={idx} className="border-b border-gray-300 hover:bg-gray-50/50">
+                  <td className="p-2.5 text-center border-r border-gray-300">{idx + 1}</td>
+                  <td className="p-2.5 font-bold border-r border-gray-300 text-gray-900">
+                    {it.nama}
+                  </td>
+                  <td className="p-2.5 text-center font-black border-r border-gray-300 text-gray-900">
+                    {it.qty}
+                  </td>
+                  <td className="p-2.5 text-center border-r border-gray-300">Pcs</td>
+                  <td className="p-2.5 text-right border-r border-gray-300 text-gray-900">
+                    Rp {(it.hargaBeli || 0).toLocaleString('id-ID')}
+                  </td>
+                  <td className="p-2.5 text-right text-gray-900 font-bold">
+                    Rp {((it.qty || 0) * (it.hargaBeli || 0)).toLocaleString('id-ID')}
+                  </td>
+                </tr>
+              ))}
+              <tr className="bg-gray-50 font-bold border-t-2 border-gray-800">
+                <td colSpan={5} className="p-2.5 text-right border-r border-gray-300 uppercase">
+                  Total Nilai Pesanan (Estimasi):
+                </td>
+                <td className="p-2.5 text-right text-[#ff3377] font-black text-sm">
+                  Rp {(po.total || 0).toLocaleString('id-ID')}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Terms / Notes */}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-[11px] text-gray-500 mb-8 leading-relaxed">
+          <p className="font-bold mb-1 text-gray-700">📌 Syarat & Ketentuan Pemesanan (Purchase Order):</p>
+          <ol className="list-decimal pl-4 space-y-0.5">
+            <li>Mohon berikan konfirmasi kesiapan barang dan estimasi tanggal pengiriman setelah menerima lembar PO resmi ini.</li>
+            <li>Seluruh produk yang dikirimkan wajib dalam kondisi fisik prima, baru, lolos QC, serta sesuai spesifikasi deskripsi di atas.</li>
+            <li>Lampirkan dokumen Surat Jalan pengiriman fisik dari Supplier dengan mencantumkan nomor referensi <b>PO-{po.id}</b> ini.</li>
+          </ol>
+        </div>
+
+        {/* Signatures */}
+        <div className="grid grid-cols-3 gap-4 text-center text-xs mt-6 pt-4 border-t border-dashed border-gray-300">
+          <div className="flex flex-col justify-between h-28">
+            <div>
+              <p className="font-semibold text-gray-500 uppercase tracking-wider text-[10px]">PEMBELI / PEMESAN</p>
+              <p className="text-gray-400 text-[10px] italic mt-0.5">(Staf / Admin Cabang)</p>
+            </div>
+            <div>
+              <p className="font-bold border-t border-gray-300 pt-1.5 text-gray-900">{user?.nama || 'Staff Pembeli'}</p>
+              <p className="text-[10px] text-gray-400 font-mono">Tgl: .../ .../ ......</p>
+            </div>
+          </div>
+          <div className="flex flex-col justify-between h-28">
+            <div>
+              <p className="font-semibold text-gray-500 uppercase tracking-wider text-[10px]">SUPPLIER / REKANAN</p>
+              <p className="text-gray-400 text-[10px] italic mt-0.5">(Konfirmasi Penerimaan PO)</p>
+            </div>
+            <div>
+              <p className="font-bold border-t border-gray-300 pt-1.5 text-gray-900">_________________</p>
+              <p className="text-[10px] text-gray-400 font-mono">Tgl: .../ .../ ......</p>
+            </div>
+          </div>
+          <div className="flex flex-col justify-between h-28">
+            <div>
+              <p className="font-semibold text-gray-500 uppercase tracking-wider text-[10px]">MENGETAHUI / MENYETUJUI</p>
+              <p className="text-gray-400 text-[10px] italic mt-0.5">(Owner / Manajemen Pusat)</p>
+            </div>
+            <div>
+              <p className="font-bold border-t border-gray-300 pt-1.5 text-[#ff3377]">Owner / Pusat</p>
+              <p className="text-[10px] text-gray-400 font-mono">Verified System ✅</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   useEffect(() => {
     if (user) {
       fetchData();
       if (user.cabang && user.cabang !== 'Semua Cabang') {
         setTrfDariCabang(user.cabang);
       } else {
-        setTrfDariCabang('Pusat');
+        setTrfDariCabang('Cabang Pusat');
       }
     }
   }, [user]);
@@ -268,6 +831,8 @@ export default function App() {
         setSettings(data.settings);
         setSetNamaToko(data.settings.namaToko);
         setSetAlamat(data.settings.alamat);
+        setSetAlamatPo(data.settings.alamatPo || data.settings.alamat || '');
+        setSetTheme(data.settings.theme || 'sakura');
         setSetLogoUrl(data.settings.logoUrl);
         setSetPajak(String(data.settings.pajakPersen));
         setSetDiskonMember(String(data.settings.diskonMemberPersen));
@@ -445,19 +1010,12 @@ export default function App() {
   };
 
   const handleHapusBarang = async (kode: string) => {
-    if (!confirm(`Hapus barang ${kode} dari semua cabang?`)) return;
-    try {
-      const res = await fetch('/api/hapusBarang', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kode })
-      });
-      const data = await res.json();
-      alert(data.m);
-      fetchData();
-    } catch (e) {
-      alert("Gagal menghapus barang");
-    }
+    triggerConfirm(
+      'Hapus Barang',
+      `Apakah Anda yakin ingin menghapus barang dengan kode ${kode} dari semua cabang? Tindakan ini tidak dapat dibatalkan.`,
+      'delete_barang',
+      { kode }
+    );
   };
 
   const simpanCabang = async (e: React.FormEvent) => {
@@ -494,19 +1052,12 @@ export default function App() {
   };
 
   const handleHapusBranch = async (id: string) => {
-    if (!confirm(`Hapus cabang ${id}?`)) return;
-    try {
-      const res = await fetch('/api/hapusCabang', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id })
-      });
-      const data = await res.json();
-      alert(data.m);
-      fetchData();
-    } catch (e) {
-      alert("Gagal menghapus cabang");
-    }
+    triggerConfirm(
+      'Hapus Cabang',
+      `Apakah Anda yakin ingin menghapus cabang dengan ID ${id}? Tindakan ini tidak dapat dibatalkan.`,
+      'delete_branch',
+      { id }
+    );
   };
 
   const handleUpdateSettings = async (e: React.FormEvent) => {
@@ -518,6 +1069,8 @@ export default function App() {
         body: JSON.stringify({
           namaToko: setNamaToko,
           alamat: setAlamat,
+          alamatPo: setAlamatPo,
+          theme: setTheme,
           logoUrl: setLogoUrl,
           pajakPersen: setPajak,
           diskonMemberPersen: setDiskonMember,
@@ -592,19 +1145,12 @@ export default function App() {
   };
 
   const handleHapusStaff = async (email: string) => {
-    if (!confirm(`Hapus akun staff ${email}?`)) return;
-    try {
-      const res = await fetch('/api/hapusUser', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      });
-      const data = await res.json();
-      alert(data.m);
-      fetchData();
-    } catch (err) {
-      alert("Gagal menghapus staff");
-    }
+    triggerConfirm(
+      'Hapus Akun Staff',
+      `Apakah Anda yakin ingin menghapus akun staff dengan email ${email}? Tindakan ini tidak dapat dibatalkan.`,
+      'delete_staff',
+      { email }
+    );
   };
 
   const handleOpnameChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -651,8 +1197,11 @@ export default function App() {
   const buatTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!trfDariCabang || !trfKeCabang || !trfKode || !trfQty) return alert("Lengkapi data transfer barang!");
-    if (trfDariCabang === trfKeCabang) return alert("Cabang asal dan cabang tujuan tidak boleh sama!");
-    const foundItem = barangList.find(b => b[1] === trfKode && (b[8] === trfDariCabang || (!b[8] && trfDariCabang === 'Pusat')));
+    const normalizedDari = trfDariCabang === 'Pusat' ? 'Cabang Pusat' : trfDariCabang;
+    const normalizedKe = trfKeCabang === 'Pusat' ? 'Cabang Pusat' : trfKeCabang;
+
+    if (normalizedDari === normalizedKe) return alert("Cabang asal dan cabang tujuan tidak boleh sama!");
+    const foundItem = barangList.find(b => b[1] === trfKode && (b[8] === normalizedDari || (!b[8] && normalizedDari === 'Cabang Pusat')));
     if (!foundItem) return alert(`Barang tidak ditemukan di stok cabang asal (${trfDariCabang}).`);
     if (Number(trfQty) > Number(foundItem[6])) {
       return alert(`Stok tidak mencukupi! Stok ${trfDariCabang} saat ini: ${foundItem[6]}`);
@@ -663,8 +1212,8 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          dariCabang: trfDariCabang,
-          keCabang: trfKeCabang,
+          dariCabang: normalizedDari,
+          keCabang: normalizedKe,
           kode: trfKode,
           nama: foundItem[2],
           qty: Number(trfQty),
@@ -715,19 +1264,12 @@ export default function App() {
   };
 
   const prosesPO = async (id: string, status: 'Received' | 'Cancelled') => {
-    if (!confirm(`Ubah status PO ${id} menjadi ${status}?`)) return;
-    try {
-      const res = await fetch('/api/prosesPO', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status })
-      });
-      const data = await res.json();
-      alert(data.m);
-      fetchData();
-    } catch (e) {
-      alert("Gagal memproses PO");
-    }
+    triggerConfirm(
+      'Ubah Status Purchase Order',
+      `Apakah Anda yakin ingin mengubah status PO ${id} menjadi ${status === 'Received' ? 'Diterima (Received)' : 'Dibatalkan (Cancelled)'}?`,
+      'process_po',
+      { id, status }
+    );
   };
 
   const [commissionMap, setCommissionMap] = useState<{ [email: string]: number }>({});
@@ -842,19 +1384,12 @@ export default function App() {
   };
 
   const prosesTransfer = async (id: string, status: 'Approved' | 'Rejected') => {
-    if (!confirm(`Yakin ingin ${status === 'Approved' ? 'Menyetujui & Memutasi Stok' : 'Menolak'} transfer ${id}?`)) return;
-    try {
-      const res = await fetch('/api/prosesTransfer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status })
-      });
-      const data = await res.json();
-      alert(data.m);
-      fetchData();
-    } catch (e) {
-      alert("Gagal memproses transfer");
-    }
+    triggerConfirm(
+      status === 'Approved' ? 'Setujui Transfer Barang' : 'Tolak Transfer Barang',
+      `Apakah Anda yakin ingin ${status === 'Approved' ? 'Menyetujui & Memutasi Stok' : 'Menolak'} transfer barang dengan ID ${id}?`,
+      'process_transfer',
+      { id, status }
+    );
   };
 
   // Export Audit Stock Opname to Excel Workbook (.csv format)
@@ -1042,141 +1577,404 @@ export default function App() {
     .sort((a, b) => String(a[1] || '').localeCompare(String(b[1] || '')));
 
   return (
-    <div className="min-h-screen bg-[#fff0f5] flex font-sans text-gray-800">
+    <>
+      <style>{`
+        :root {
+          --primary-color: ${currentTheme.primary};
+          --primary-hover: ${currentTheme.primaryHover};
+          --secondary-color: ${currentTheme.secondary};
+          --secondary-hover: ${currentTheme.secondaryHover};
+          --bg-color: ${currentTheme.bg};
+          --light-tint: ${currentTheme.lightTint};
+          --border-tint: ${currentTheme.borderTint};
+          --text-color: ${currentTheme.textColor};
+          --glow: ${currentTheme.glow};
+        }
+
+        /* Dynamically override pink-themed background and colors across the app to support corporate colors */
+        #root-app-layout {
+          background-color: var(--bg-color) !important;
+        }
+
+        /* Dynamic classes overrides */
+        .sidebar-theme-bg {
+          background-color: var(--secondary-color) !important;
+        }
+        .toggle-btn-theme {
+          background-color: var(--primary-color) !important;
+        }
+        .toggle-btn-theme:hover {
+          background-color: var(--primary-hover) !important;
+        }
+        .nav-btn-active {
+          background-color: var(--primary-color) !important;
+          color: #ffffff !important;
+          box-shadow: 0 4px 6px -1px var(--glow), 0 2px 4px -1px var(--glow) !important;
+        }
+        .nav-btn-inactive {
+          background-color: transparent !important;
+          color: rgba(255, 255, 255, 0.85) !important;
+          box-shadow: none !important;
+        }
+        .nav-btn-inactive:hover {
+          background-color: rgba(0, 0, 0, 0.12) !important;
+          color: #ffffff !important;
+        }
+        .nav-category-header {
+          color: var(--light-tint) !important;
+          opacity: 0.95;
+        }
+
+        /* Wildcard/Attribute overrides for total precision across every button & component */
+        [class*="bg-[#ff3377]"], [class*="bg-pink-600"] {
+          background-color: var(--primary-color) !important;
+        }
+        [class*="bg-[#ff6699]"], [class*="bg-pink-500"] {
+          background-color: var(--secondary-color) !important;
+        }
+        [class*="hover:bg-[#ff1a5c]"]:hover, [class*="hover:bg-pink-700"]:hover, [class*="hover:bg-pink-800"]:hover {
+          background-color: var(--primary-hover) !important;
+        }
+        [class*="hover:bg-[#ff3377]"]:hover {
+          background-color: var(--primary-color) !important;
+        }
+        [class*="text-[#ff3377]"], [class*="text-pink-600"], [class*="text-pink-500"] {
+          color: var(--primary-color) !important;
+        }
+        [class*="text-[#ff6699]"] {
+          color: var(--secondary-color) !important;
+        }
+        [class*="border-pink-100"], [class*="border-pink-200"], [class*="border-pink-300"], [class*="border-pink-400"] {
+          border-color: var(--border-tint) !important;
+        }
+        [class*="bg-pink-50"], [class*="bg-pink-100"] {
+          background-color: var(--light-tint) !important;
+        }
+        [class*="focus:ring-[#ff6699]"]:focus, [class*="focus:ring-pink-500"]:focus {
+          --tw-ring-color: var(--primary-color) !important;
+        }
+        [class*="focus:border-[#ff6699]"]:focus, [class*="focus:border-pink-500"]:focus {
+          border-color: var(--primary-color) !important;
+        }
+        [class*="text-pink-700"] {
+          color: var(--primary-hover) !important;
+        }
+
+        .text-\[\#ff3377\] {
+          color: var(--primary-color) !important;
+        }
+        .bg-\[\#ff3377\] {
+          background-color: var(--primary-color) !important;
+        }
+        .hover\:bg-\[\#ff1a5c\]:hover {
+          background-color: var(--primary-hover) !important;
+        }
+        .bg-\[\#ff6699\] {
+          background-color: var(--secondary-color) !important;
+        }
+        .hover\:bg-\[\#ff3377\]:hover {
+          background-color: var(--primary-color) !important;
+        }
+        .hover\:bg-\[\#ff6699\]\/60:hover {
+          background-color: rgba(${currentTheme.id === 'sakura' ? '255, 102, 153' : currentTheme.id === 'emerald' ? '16, 185, 129' : currentTheme.id === 'ocean' ? '59, 130, 246' : currentTheme.id === 'amethyst' ? '139, 92, 246' : currentTheme.id === 'sunset' ? '249, 115, 22' : '75, 85, 99'}, 0.6) !important;
+        }
+        .bg-\[\#fff0f5\] {
+          background-color: var(--bg-color) !important;
+        }
+        .bg-pink-50, .bg-pink-50\/40 {
+          background-color: var(--light-tint) !important;
+        }
+        .bg-pink-100 {
+          background-color: var(--light-tint) !important;
+        }
+        .border-pink-100, .border-pink-200, .border-pink-300 {
+          border-color: var(--border-tint) !important;
+        }
+        .text-pink-500, .text-pink-600 {
+          color: var(--primary-color) !important;
+        }
+        .text-pink-700 {
+          color: var(--primary-hover) !important;
+        }
+        .bg-pink-500, .bg-pink-600 {
+          background-color: var(--primary-color) !important;
+        }
+        .bg-pink-700 {
+          background-color: var(--primary-hover) !important;
+        }
+        .hover\:bg-pink-800:hover, .hover\:bg-pink-700:hover {
+          background-color: var(--primary-hover) !important;
+        }
+        .hover\:bg-pink-50:hover {
+          background-color: var(--light-tint) !important;
+        }
+
+        /* Summary table colors */
+        .bg-\[\#ffebf0\] {
+          background-color: var(--light-tint) !important;
+        }
+        .hover\:bg-\[\#ffebf0\]\/80:hover {
+          background-color: rgba(${currentTheme.id === 'sakura' ? '255, 102, 153' : currentTheme.id === 'emerald' ? '16, 185, 129' : currentTheme.id === 'ocean' ? '59, 130, 246' : currentTheme.id === 'amethyst' ? '139, 92, 246' : currentTheme.id === 'sunset' ? '249, 115, 22' : '75, 85, 99'}, 0.15) !important;
+        }
+        .bg-\[\#ffd1df\] {
+          background-color: var(--light-tint) !important;
+        }
+        .bg-\[\#ffd1df\]\/20 {
+          background-color: rgba(${currentTheme.id === 'sakura' ? '255, 102, 153' : currentTheme.id === 'emerald' ? '16, 185, 129' : currentTheme.id === 'ocean' ? '59, 130, 246' : currentTheme.id === 'amethyst' ? '139, 92, 246' : currentTheme.id === 'sunset' ? '249, 115, 22' : '75, 85, 99'}, 0.1) !important;
+        }
+        .bg-\[\#ffd1df\]\/10 {
+          background-color: rgba(${currentTheme.id === 'sakura' ? '255, 102, 153' : currentTheme.id === 'emerald' ? '16, 185, 129' : currentTheme.id === 'ocean' ? '59, 130, 246' : currentTheme.id === 'amethyst' ? '139, 92, 246' : currentTheme.id === 'sunset' ? '249, 115, 22' : '75, 85, 99'}, 0.05) !important;
+        }
+
+        /* Buttons glow shadow override */
+        .shadow-pink-200 {
+          box-shadow: 0 4px 6px -1px var(--glow), 0 2px 4px -1px var(--glow) !important;
+        }
+        .from-pink-500 {
+          --tw-gradient-from: var(--primary-color) !important;
+          --tw-gradient-to: var(--secondary-color) !important;
+          --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+        }
+        .to-pink-600 {
+          --tw-gradient-to: var(--primary-hover) !important;
+        }
+        .from-pink-50 {
+          --tw-gradient-from: var(--light-tint) !important;
+          --tw-gradient-to: white !important;
+          --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+        }
+
+        @media print {
+          /* Hide all screen components */
+          #root-app-layout, 
+          .fixed, 
+          .backdrop-blur-xs, 
+          div[role="dialog"],
+          button,
+          nav,
+          header {
+            display: none !important;
+          }
+          body {
+            background-color: white !important;
+            color: black !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          #po-print-container {
+            display: block !important;
+            width: 100% !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+        }
+      `}</style>
+
+      <div id="root-app-layout" className="min-h-screen bg-[#fff0f5] flex font-sans text-gray-800 print:hidden">
       {/* Sidebar with wider, prominent logo */}
-      <div className="w-72 bg-[#ff6699] text-white flex flex-col p-5 shadow-lg shrink-0">
+      <div className={`${isSidebarCollapsed ? 'w-20' : 'w-72'} bg-[#ff6699] sidebar-theme-bg text-white flex flex-col p-5 shadow-lg shrink-0 transition-all duration-300 relative`}>
+        {/* Collapse Toggle Button */}
+        <button 
+          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
+          className="absolute top-4 -right-3.5 bg-[#ff3377] toggle-btn-theme text-white p-1 rounded-full border border-white hover:bg-[#ff1a5c] shadow transition-transform duration-200 z-50 flex items-center justify-center cursor-pointer"
+          title={isSidebarCollapsed ? "Expand Navigation" : "Collapse Navigation"}
+        >
+          {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </button>
+
         <div className="flex flex-col items-center justify-center mb-4 text-center">
-          <img src={settings.logoUrl} alt="Logo" className="w-full h-28 object-cover rounded-xl shadow-md border-2 border-white mb-2" referrerPolicy="no-referrer" />
-          <h3 className="text-xl font-bold tracking-tight">{settings.namaToko}</h3>
+          {isSidebarCollapsed ? (
+            <img src={settings.logoUrl} alt="Logo" className="w-10 h-10 object-cover rounded-full shadow-md border border-white mb-1" referrerPolicy="no-referrer" />
+          ) : (
+            <>
+              <img src={settings.logoUrl} alt="Logo" className="w-full h-28 object-cover rounded-xl shadow-md border-2 border-white mb-2" referrerPolicy="no-referrer" />
+              <h3 className="text-xl font-bold tracking-tight">{settings.namaToko}</h3>
+            </>
+          )}
         </div>
-        <div className="text-center mb-5 text-xs bg-white/10 p-3 rounded-xl backdrop-blur-sm space-y-1">
-          <b className="text-sm font-semibold">{user.nama}</b> ({user.role})<br/>
-          <span className="inline-block px-2.5 py-0.5 bg-white text-gray-900 rounded font-bold text-xs">{user.cabang}</span>
-          <div className="text-white/90 text-[11px] flex items-center justify-center gap-1 pt-1">
-            <Clock className="w-3 h-3"/> Masuk: {user.loginTime} | Shift: {user.shift}
+
+        {!isSidebarCollapsed ? (
+          <div className="text-center mb-5 text-xs bg-white/10 p-3 rounded-xl backdrop-blur-sm space-y-1">
+            <b className="text-sm font-semibold">{user.nama}</b> ({user.role})<br/>
+            <span className="inline-block px-2.5 py-0.5 bg-white text-gray-900 rounded font-bold text-xs">{user.cabang}</span>
+            <div className="text-white/90 text-[11px] flex items-center justify-center gap-1 pt-1">
+              <Clock className="w-3 h-3"/> Masuk: {user.loginTime} | Shift: {user.shift}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="text-center mb-3 bg-white/10 py-1.5 px-1 rounded-lg text-[10px] truncate font-bold" title={`${user.nama} (${user.role})`}>
+            {user.role.substring(0, 5)}..
+          </div>
+        )}
+
         <hr className="border-white/20 mb-4" />
 
-        <nav className="space-y-1.5 flex-1 text-sm">
+        <nav className="space-y-1.5 flex-1 text-sm overflow-y-auto no-scrollbar">
           <button 
             onClick={() => setActiveTab('pos')}
-            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-colors ${activeTab === 'pos' ? 'bg-[#ff3377] text-white shadow' : 'text-white/90 hover:bg-[#ff3377]/60'}`}
+            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-colors ${activeTab === 'pos' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+            title="Kasir POS"
           >
-            <ShoppingCart className="w-4 h-4" /> Kasir POS
+            <ShoppingCart className="w-4 h-4 shrink-0" />
+            {!isSidebarCollapsed && <span>Kasir POS</span>}
           </button>
           
           {(user.role === 'Owner' || user.role === 'Admin Cabang') && (
             <button 
               onClick={() => setActiveTab('barang')}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-colors ${activeTab === 'barang' ? 'bg-[#ff3377] text-white shadow' : 'text-white/90 hover:bg-[#ff3377]/60'}`}
+              className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-colors ${activeTab === 'barang' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+              title="Kelola Barang"
             >
-              <Package className="w-4 h-4" /> Kelola Barang
+              <Package className="w-4 h-4 shrink-0" />
+              {!isSidebarCollapsed && <span>Kelola Barang</span>}
             </button>
           )}
 
           {(user.role === 'Owner' || user.role === 'Admin Cabang') && (
             <button 
               onClick={() => setActiveTab('opname')}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-colors ${activeTab === 'opname' ? 'bg-[#ff3377] text-white shadow' : 'text-white/90 hover:bg-[#ff3377]/60'}`}
+              className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-colors ${activeTab === 'opname' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+              title="Stok Opname"
             >
-              <Scale className="w-4 h-4" /> Stok Opname
+              <Scale className="w-4 h-4 shrink-0" />
+              {!isSidebarCollapsed && <span>Stok Opname</span>}
             </button>
           )}
 
           <button 
             onClick={() => setActiveTab('laporan')}
-            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-colors ${activeTab === 'laporan' ? 'bg-[#ff3377] text-white shadow' : 'text-white/90 hover:bg-[#ff3377]/60'}`}
+            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-colors ${activeTab === 'laporan' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+            title="Lap. Keuangan Analitik"
           >
-            <BarChart3 className="w-4 h-4" /> Lap. Keuangan Analitik
+            <BarChart3 className="w-4 h-4 shrink-0" />
+            {!isSidebarCollapsed && <span>Lap. Keuangan Analitik</span>}
           </button>
 
           {(user.role === 'Owner' || user.role === 'Admin Cabang') && (
             <button 
               onClick={() => setActiveTab('audit')}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-colors ${activeTab === 'audit' ? 'bg-[#ff3377] text-white shadow' : 'text-white/90 hover:bg-[#ff3377]/60'}`}
+              className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-colors ${activeTab === 'audit' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+              title="Audit Stok Opname"
             >
-              <ShieldCheck className="w-4 h-4" /> Audit Stok Opname
+              <ShieldCheck className="w-4 h-4 shrink-0" />
+              {!isSidebarCollapsed && <span>Audit Stok Opname</span>}
             </button>
           )}
 
           <button 
             onClick={() => setActiveTab('transfer')}
-            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-colors ${activeTab === 'transfer' ? 'bg-[#ff3377] text-white shadow' : 'text-white/90 hover:bg-[#ff3377]/60'}`}
+            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-colors ${activeTab === 'transfer' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+            title="Transfer Antar Cabang"
           >
-            <ArrowRightLeft className="w-4 h-4" /> Transfer Antar Cabang
+            <ArrowRightLeft className="w-4 h-4 shrink-0" />
+            {!isSidebarCollapsed && <span>Transfer Antar Cabang</span>}
           </button>
 
-          <div className="pt-2 pb-1 border-t border-white/25 my-2">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-pink-200 px-3">Modul ERP Terpusat</span>
-          </div>
+          {isSidebarCollapsed ? (
+            <hr className="border-white/20 my-2" />
+          ) : (
+            <div className="pt-2 pb-1 border-t border-white/25 my-2">
+              <span className="text-[10px] uppercase font-bold tracking-wider nav-category-header text-pink-200 px-3">Modul ERP Terpusat</span>
+            </div>
+          )}
+
           <button 
             onClick={() => setActiveTab('erp')}
-            className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'erp' ? 'bg-[#ff3377] text-white shadow' : 'text-white/90 hover:bg-[#ff3377]/60'}`}
+            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'gap-3 px-4 py-2'} rounded-lg font-medium transition-colors ${activeTab === 'erp' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+            title="ERP Executive Cockpit"
           >
-            <Boxes className="w-4 h-4" /> ERP Executive Cockpit
+            <Boxes className="w-4 h-4 shrink-0" />
+            {!isSidebarCollapsed && <span>ERP Executive Cockpit</span>}
           </button>
           <button 
             onClick={() => setActiveTab('ledger')}
-            className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'ledger' ? 'bg-[#ff3377] text-white shadow' : 'text-white/90 hover:bg-[#ff3377]/60'}`}
+            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'gap-3 px-4 py-2'} rounded-lg font-medium transition-colors ${activeTab === 'ledger' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+            title="Buku Besar Akuntansi"
           >
-            <BookOpen className="w-4 h-4" /> Buku Besar Akuntansi
+            <BookOpen className="w-4 h-4 shrink-0" />
+            {!isSidebarCollapsed && <span>Buku Besar Akuntansi</span>}
           </button>
           <button 
             onClick={() => setActiveTab('po')}
-            className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'po' ? 'bg-[#ff3377] text-white shadow' : 'text-white/90 hover:bg-[#ff3377]/60'}`}
+            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'gap-3 px-4 py-2'} rounded-lg font-medium transition-colors ${activeTab === 'po' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+            title="Rantai Pasok & PO"
           >
-            <Truck className="w-4 h-4" /> Rantai Pasok & PO
+            <Truck className="w-4 h-4 shrink-0" />
+            {!isSidebarCollapsed && <span>Rantai Pasok & PO</span>}
           </button>
           <button 
             onClick={() => setActiveTab('payroll')}
-            className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'payroll' ? 'bg-[#ff3377] text-white shadow' : 'text-white/90 hover:bg-[#ff3377]/60'}`}
+            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'gap-3 px-4 py-2'} rounded-lg font-medium transition-colors ${activeTab === 'payroll' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+            title="SDM & Payroll Komisi"
           >
-            <Wallet className="w-4 h-4" /> SDM & Payroll Komisi
+            <Wallet className="w-4 h-4 shrink-0" />
+            {!isSidebarCollapsed && <span>SDM & Payroll Komisi</span>}
           </button>
           <button 
             onClick={() => setActiveTab('production')}
-            className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'production' ? 'bg-[#ff3377] text-white shadow' : 'text-white/90 hover:bg-[#ff3377]/60'}`}
+            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'gap-3 px-4 py-2'} rounded-lg font-medium transition-colors ${activeTab === 'production' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+            title="Manufaktur & BOM"
           >
-            <Factory className="w-4 h-4" /> Manufaktur & BOM
+            <Factory className="w-4 h-4 shrink-0" />
+            {!isSidebarCollapsed && <span>Manufaktur & BOM</span>}
           </button>
 
           {user.role === 'Owner' && (
             <>
+              {isSidebarCollapsed ? (
+                <hr className="border-white/20 my-2" />
+              ) : (
+                <div className="pt-2 pb-1 border-t border-white/25 my-2">
+                  <span className="text-[10px] uppercase font-bold tracking-wider nav-category-header text-pink-200 px-3">Manajemen Cabang</span>
+                </div>
+              )}
               <button 
                 onClick={() => setActiveTab('cabang')}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-colors ${activeTab === 'cabang' ? 'bg-[#ff3377] text-white shadow' : 'text-white/90 hover:bg-[#ff3377]/60'}`}
+                className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-colors ${activeTab === 'cabang' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+                title="Kelola Cabang"
               >
-                <Building2 className="w-4 h-4" /> Kelola Cabang
+                <Building2 className="w-4 h-4 shrink-0" />
+                {!isSidebarCollapsed && <span>Kelola Cabang</span>}
               </button>
               <button 
                 onClick={() => setActiveTab('staff')}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-colors ${activeTab === 'staff' ? 'bg-[#ff3377] text-white shadow' : 'text-white/90 hover:bg-[#ff3377]/60'}`}
+                className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-colors ${activeTab === 'staff' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+                title="Kelola Staff & Akses"
               >
-                <Users className="w-4 h-4" /> Kelola Staff & Akses
+                <Users className="w-4 h-4 shrink-0" />
+                {!isSidebarCollapsed && <span>Kelola Staff & Akses</span>}
               </button>
               <button 
                 onClick={() => setActiveTab('settings')}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-colors ${activeTab === 'settings' ? 'bg-[#ff3377] text-white shadow' : 'text-white/90 hover:bg-[#ff3377]/60'}`}
+                className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-colors ${activeTab === 'settings' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+                title="Pengaturan Toko & Bank"
               >
-                <Settings className="w-4 h-4" /> Pengaturan Toko & Bank
+                <Settings className="w-4 h-4 shrink-0" />
+                {!isSidebarCollapsed && <span>Pengaturan Toko & Bank</span>}
               </button>
             </>
           )}
 
           <button 
             onClick={() => setActiveTab('panduan')}
-            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-colors ${activeTab === 'panduan' ? 'bg-[#ff3377] text-white shadow' : 'text-white/90 hover:bg-[#ff3377]/60'}`}
+            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-colors ${activeTab === 'panduan' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+            title="Panduan & Cara Pakai"
           >
-            <HelpCircle className="w-4 h-4" /> Panduan & Cara Pakai
+            <HelpCircle className="w-4 h-4 shrink-0" />
+            {!isSidebarCollapsed && <span>Panduan & Cara Pakai</span>}
           </button>
         </nav>
 
         <button 
           onClick={() => setUser(null)}
-          className="mt-auto w-full bg-red-500 hover:bg-red-600 text-white font-medium py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm shadow transition-colors"
+          className={`mt-auto w-full bg-red-500 hover:bg-red-600 text-white font-medium ${isSidebarCollapsed ? 'p-2.5 justify-center' : 'py-2.5 justify-center'} rounded-lg flex items-center gap-2 text-sm shadow transition-colors`}
+          title="Keluar / Log Out"
         >
-          <LogOut className="w-4 h-4" /> Keluar / Log Out
+          <LogOut className="w-4 h-4 shrink-0" />
+          {!isSidebarCollapsed && <span>Keluar / Log Out</span>}
         </button>
       </div>
 
@@ -1562,6 +2360,44 @@ export default function App() {
                     ))
                   )}
                 </tbody>
+                <tfoot className="bg-pink-50 border-t-2 border-pink-200 font-bold text-gray-800 text-xs">
+                  <tr className="hover:bg-pink-50/50">
+                    <td colSpan={3} className="p-3 text-right text-xs uppercase tracking-wider text-gray-500 font-bold">
+                      Total ({user.cabang}):
+                    </td>
+                    <td className="p-3 text-gray-800 font-semibold">
+                      Rp {filteredBarang.reduce((sum, b) => sum + (Number(b[6] || 0) * Number(b[3] || 0)), 0).toLocaleString('id-ID')}
+                    </td>
+                    <td className="p-3 text-gray-800 font-semibold">
+                      Rp {filteredBarang.reduce((sum, b) => sum + (Number(b[6] || 0) * Number(b[4] || 0)), 0).toLocaleString('id-ID')}
+                    </td>
+                    <td className="p-3 text-[#ff3377] font-semibold">
+                      Rp {filteredBarang.reduce((sum, b) => sum + (Number(b[6] || 0) * Number(b[5] || 0)), 0).toLocaleString('id-ID')}
+                    </td>
+                    <td className="p-3 text-center text-sm font-extrabold text-[#ff3377] bg-pink-100/30">
+                      {filteredBarang.reduce((sum, b) => sum + Number(b[6] || 0), 0).toLocaleString('id-ID')}
+                    </td>
+                    <td colSpan={2} className="p-3"></td>
+                  </tr>
+                  <tr className="bg-[#ffebf0] border-t border-pink-200 hover:bg-[#ffebf0]/80">
+                    <td colSpan={3} className="p-3 text-right text-xs uppercase tracking-wider text-[#ff3377] font-extrabold">
+                      Total Seluruh Cabang (Konsolidasi):
+                    </td>
+                    <td className="p-3 text-gray-900 font-extrabold bg-[#ffd1df]/20">
+                      Rp {barangList.reduce((sum, b) => sum + (Number(b[6] || 0) * Number(b[3] || 0)), 0).toLocaleString('id-ID')}
+                    </td>
+                    <td className="p-3 text-gray-900 font-extrabold bg-[#ffd1df]/20">
+                      Rp {barangList.reduce((sum, b) => sum + (Number(b[6] || 0) * Number(b[4] || 0)), 0).toLocaleString('id-ID')}
+                    </td>
+                    <td className="p-3 text-[#ff3377] font-extrabold bg-[#ffd1df]/20">
+                      Rp {barangList.reduce((sum, b) => sum + (Number(b[6] || 0) * Number(b[5] || 0)), 0).toLocaleString('id-ID')}
+                    </td>
+                    <td className="p-3 text-center text-sm font-extrabold text-[#ff3377] bg-[#ffd1df]">
+                      {barangList.reduce((sum, b) => sum + Number(b[6] || 0), 0).toLocaleString('id-ID')}
+                    </td>
+                    <td colSpan={2} className="p-3 bg-[#ffd1df]/10"></td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </div>
@@ -1704,40 +2540,40 @@ export default function App() {
                   <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 text-xs">
                     <div>
                       <label className="font-semibold text-gray-600 block mb-1">Sewa Gedung</label>
-                      <input type="number" value={curOp.sewa} onChange={e => updateCurOp('sewa', Number(e.target.value))} className="w-full px-2.5 py-1.5 bg-white border rounded font-bold" />
+                      <input type="text" value={formatNumberWithDots(curOp.sewa)} onChange={e => updateCurOp('sewa', parseNumberFromDots(e.target.value))} className="w-full px-2.5 py-1.5 bg-white border rounded font-bold" />
                     </div>
                     <div>
                       <label className="font-semibold text-gray-600 block mb-1">Listrik</label>
-                      <input type="number" value={curOp.listrik} onChange={e => updateCurOp('listrik', Number(e.target.value))} className="w-full px-2.5 py-1.5 bg-white border rounded font-bold" />
+                      <input type="text" value={formatNumberWithDots(curOp.listrik)} onChange={e => updateCurOp('listrik', parseNumberFromDots(e.target.value))} className="w-full px-2.5 py-1.5 bg-white border rounded font-bold" />
                     </div>
                     <div>
                       <label className="font-semibold text-gray-600 block mb-1">Air</label>
-                      <input type="number" value={curOp.air} onChange={e => updateCurOp('air', Number(e.target.value))} className="w-full px-2.5 py-1.5 bg-white border rounded font-bold" />
+                      <input type="text" value={formatNumberWithDots(curOp.air)} onChange={e => updateCurOp('air', parseNumberFromDots(e.target.value))} className="w-full px-2.5 py-1.5 bg-white border rounded font-bold" />
                     </div>
                     <div>
                       <label className="font-semibold text-gray-600 block mb-1">Gaji Pokok</label>
-                      <input type="number" value={curOp.gaji} onChange={e => updateCurOp('gaji', Number(e.target.value))} className="w-full px-2.5 py-1.5 bg-white border rounded font-bold" />
+                      <input type="text" value={formatNumberWithDots(curOp.gaji)} onChange={e => updateCurOp('gaji', parseNumberFromDots(e.target.value))} className="w-full px-2.5 py-1.5 bg-white border rounded font-bold" />
                     </div>
                     <div>
                       <label className="font-semibold text-gray-600 block mb-1">Telekomunikasi</label>
-                      <input type="number" value={curOp.telepon} onChange={e => updateCurOp('telepon', Number(e.target.value))} className="w-full px-2.5 py-1.5 bg-white border rounded font-bold" />
+                      <input type="text" value={formatNumberWithDots(curOp.telepon)} onChange={e => updateCurOp('telepon', parseNumberFromDots(e.target.value))} className="w-full px-2.5 py-1.5 bg-white border rounded font-bold" />
                     </div>
                     <div>
                       <label className="font-semibold text-gray-600 block mb-1">Transport</label>
-                      <input type="number" value={curOp.transport} onChange={e => updateCurOp('transport', Number(e.target.value))} className="w-full px-2.5 py-1.5 bg-white border rounded font-bold" />
+                      <input type="text" value={formatNumberWithDots(curOp.transport)} onChange={e => updateCurOp('transport', parseNumberFromDots(e.target.value))} className="w-full px-2.5 py-1.5 bg-white border rounded font-bold" />
                     </div>
                     <div>
                       <label className="font-semibold text-gray-600 block mb-1">CSR / Lainnya</label>
-                      <input type="number" value={curOp.csr} onChange={e => updateCurOp('csr', Number(e.target.value))} className="w-full px-2.5 py-1.5 bg-white border rounded font-bold" />
+                      <input type="text" value={formatNumberWithDots(curOp.csr)} onChange={e => updateCurOp('csr', parseNumberFromDots(e.target.value))} className="w-full px-2.5 py-1.5 bg-white border rounded font-bold" />
                     </div>
                   </div>
                 );
               })()}
 
               <div className="flex flex-wrap items-center justify-between text-xs text-gray-700 pt-2 border-t border-pink-200">
-                <span>Laba Kotor: <b>Rp {Math.round(totalLabaKotor).toLocaleString()}</b></span>
-                <span>Total Biaya Operasional ({actualBranchFilter === 'ALL' ? 'Semua Cabang Konsolidasi' : actualBranchFilter}): <b className="text-red-600">Rp {Math.round(totalBiayaOperasional).toLocaleString()}</b></span>
-                <span className="text-[#ff3377] font-bold text-sm">Laba Bersih (Net Profit): Rp {Math.round(totalLabaBersih).toLocaleString()}</span>
+                <span>Laba Kotor: <b>Rp {Math.round(totalLabaKotor).toLocaleString('id-ID')}</b></span>
+                <span>Total Biaya Operasional ({actualBranchFilter === 'ALL' ? 'Semua Cabang Konsolidasi' : actualBranchFilter}): <b className="text-red-600">Rp {Math.round(totalBiayaOperasional).toLocaleString('id-ID')}</b></span>
+                <span className="text-[#ff3377] font-bold text-sm">Laba Bersih (Net Profit): Rp {Math.round(totalLabaBersih).toLocaleString('id-ID')}</span>
               </div>
             </div>
 
@@ -1745,26 +2581,100 @@ export default function App() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
               <div className="bg-gradient-to-br from-[#ff6699] to-[#ff3377] text-white p-4 rounded-2xl shadow">
                 <h5 className="text-xs font-medium opacity-90 mb-1 flex items-center gap-1"><TrendingUp className="w-3.5 h-3.5"/> Total Omset</h5>
-                <h3 className="text-lg font-bold">Rp {totalOmset.toLocaleString()}</h3>
+                <h3 className="text-lg font-bold">Rp {totalOmset.toLocaleString('id-ID')}</h3>
               </div>
               <div className="bg-pink-50 text-[#ff3377] p-4 rounded-2xl border border-pink-100 shadow-xs">
                 <h5 className="text-xs font-medium opacity-90 mb-1">Perkiraan Laba Bersih</h5>
-                <h3 className="text-lg font-bold">Rp {Math.round(totalLabaBersih).toLocaleString()}</h3>
+                <h3 className="text-lg font-bold">Rp {Math.round(totalLabaBersih).toLocaleString('id-ID')}</h3>
               </div>
               <div className="bg-white text-gray-800 p-4 rounded-2xl border border-gray-200 shadow-xs">
                 <h5 className="text-xs font-medium text-gray-500 mb-1">Pajak PPN (11%)</h5>
-                <h3 className="text-lg font-bold text-gray-800">Rp {totalPajak.toLocaleString()}</h3>
+                <h3 className="text-lg font-bold text-gray-800">Rp {totalPajak.toLocaleString('id-ID')}</h3>
               </div>
               <div className="bg-white text-gray-800 p-4 rounded-2xl border border-gray-200 shadow-xs">
                 <h5 className="text-xs font-medium text-gray-500 mb-1">Diskon Member</h5>
-                <h3 className="text-lg font-bold text-gray-800">Rp {totalDiskon.toLocaleString()}</h3>
+                <h3 className="text-lg font-bold text-gray-800">Rp {totalDiskon.toLocaleString('id-ID')}</h3>
               </div>
               <div className="bg-white text-gray-800 p-4 rounded-2xl border border-gray-200 shadow-xs">
                 <h5 className="text-xs font-medium text-gray-500 mb-1">Metode Bayar (Cash / QRIS)</h5>
                 <div className="text-xs font-semibold text-gray-700 mt-1">
-                  Cash: Rp {cashTotal.toLocaleString()}<br/>
-                  QRIS: Rp {qrisTotal.toLocaleString()}
+                  Cash: Rp {cashTotal.toLocaleString('id-ID')}<br/>
+                  QRIS: Rp {qrisTotal.toLocaleString('id-ID')}
                 </div>
+              </div>
+            </div>
+
+            {/* Monthly Sales Trend Chart Card */}
+            <div className="bg-pink-50/30 p-5 rounded-2xl border border-pink-100 mb-6">
+              <h5 className="text-[#ff3377] font-bold text-sm mb-3 flex items-center gap-1.5">
+                <BarChart3 className="w-4 h-4" /> Tren Omset Bulanan (Rp)
+              </h5>
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={(() => {
+                      const monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
+                      const groups: { [key: string]: number } = {};
+
+                      const now = new Date();
+                      for (let i = 5; i >= 0; i--) {
+                        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                        const key = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+                        groups[key] = 0;
+                      }
+
+                      filteredTransaksi.forEach(t => {
+                        const d = new Date(t[0]);
+                        if (!isNaN(d.getTime())) {
+                          const key = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+                          if (groups[key] !== undefined) {
+                            groups[key] += Number(t[5] || 0);
+                          }
+                        }
+                      });
+
+                      const keys = Object.keys(groups).sort((a, b) => {
+                        const partsA = a.split(' ');
+                        const partsB = b.split(' ');
+                        const yearA = parseInt(partsA[1]);
+                        const yearB = parseInt(partsB[1]);
+                        if (yearA !== yearB) return yearA - yearB;
+                        return monthNames.indexOf(partsA[0]) - monthNames.indexOf(partsB[0]);
+                      });
+
+                      return keys.map(k => ({
+                        Bulan: k,
+                        Omset: groups[k]
+                      }));
+                    })()}
+                    margin={{ top: 10, right: 10, left: 20, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0e0e5" />
+                    <XAxis 
+                      dataKey="Bulan" 
+                      tick={{ fill: currentTheme.primary, fontSize: 11, fontWeight: 'bold' }} 
+                      axisLine={{ stroke: currentTheme.borderTint }} 
+                      tickLine={false}
+                    />
+                    <YAxis 
+                      tick={{ fill: '#666', fontSize: 10 }} 
+                      axisLine={false} 
+                      tickLine={false}
+                      tickFormatter={(value) => `Rp ${value >= 1000000 ? (value / 1000000).toFixed(1) + 'M' : value.toLocaleString('id-ID')}`}
+                    />
+                    <Tooltip 
+                      formatter={(value: any) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Omset']}
+                      contentStyle={{ backgroundColor: '#fff', border: `1px solid ${currentTheme.borderTint}`, borderRadius: '12px', fontSize: '12px' }}
+                    />
+                    <Bar 
+                      dataKey="Omset" 
+                      fill={currentTheme.secondary} 
+                      radius={[6, 6, 0, 0]} 
+                      maxBarSize={50} 
+                      animationDuration={1500}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </div>
 
@@ -1794,10 +2704,10 @@ export default function App() {
                         <td className="p-3 font-mono font-medium text-xs">{t[1]}</td>
                         <td className="p-3">{t[3]}</td>
                         <td className="p-3"><span className="px-2 py-0.5 bg-pink-100 text-[#ff3377] text-xs rounded font-medium">{t[4]}</span></td>
-                        <td className="p-3">Rp {Number(t[8] || t[5] || 0).toLocaleString()}</td>
-                        <td className="p-3 text-green-600">- Rp {Number(t[9] || 0).toLocaleString()}</td>
-                        <td className="p-3">+ Rp {Number(t[10] || 0).toLocaleString()}</td>
-                        <td className="p-3 font-bold text-[#ff3377]">Rp {Number(t[5] || 0).toLocaleString()}</td>
+                        <td className="p-3">Rp {Number(t[8] || t[5] || 0).toLocaleString('id-ID')}</td>
+                        <td className="p-3 text-green-600">- Rp {Number(t[9] || 0).toLocaleString('id-ID')}</td>
+                        <td className="p-3">+ Rp {Number(t[10] || 0).toLocaleString('id-ID')}</td>
+                        <td className="p-3 font-bold text-[#ff3377]">Rp {Number(t[5] || 0).toLocaleString('id-ID')}</td>
                         <td className="p-3"><span className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded font-medium">{t[6]}</span></td>
                       </tr>
                     ))
@@ -2078,7 +2988,10 @@ export default function App() {
                     >
                       <option value="">-- Pilih Barang & Stok --</option>
                       {barangList
-                        .filter(b => b[8] === trfDariCabang || (!b[8] && trfDariCabang === 'Pusat'))
+                        .filter(b => {
+                          const normalizedDari = trfDariCabang === 'Pusat' ? 'Cabang Pusat' : trfDariCabang;
+                          return b[8] === normalizedDari || (!b[8] && normalizedDari === 'Cabang Pusat');
+                        })
                         .map((b, i) => (
                           <option key={i} value={b[1]}>
                             {b[1]} - {b[2]} ({b[8] || 'Pusat'} - Stok: {b[6]})
@@ -2199,8 +3112,44 @@ export default function App() {
                   <input type="text" value={setNamaToko} onChange={e => setSetNamaToko(e.target.value)} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm" />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-gray-600 block mb-1">Alamat Utama</label>
+                  <label className="text-xs font-semibold text-gray-600 block mb-1">Alamat Utama (Struk & POS)</label>
                   <input type="text" value={setAlamat} onChange={e => setSetAlamat(e.target.value)} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm" />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-xs font-semibold text-gray-600 block mb-1">Alamat Khusus Surat Purchase Order (PO)</label>
+                  <input type="text" value={setAlamatPo} onChange={e => setSetAlamatPo(e.target.value)} placeholder="Tulis alamat kantor pusat / buyer untuk dokumen PO..." className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm" />
+                  <span className="text-[10px] text-gray-400">Jika dikosongkan, dokumen PO akan otomatis menggunakan Alamat Utama di atas.</span>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-xs font-bold text-gray-700 block mb-2">Corporate Color Theme (Warna Aplikasi & Navigator)</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                    {THEMES.map((th) => (
+                      <button
+                        key={th.id}
+                        type="button"
+                        onClick={() => setSetTheme(th.id)}
+                        className={`p-2.5 rounded-xl border text-left transition-all ${
+                          setTheme === th.id
+                            ? 'border-gray-800 bg-gray-50 ring-2 ring-gray-400'
+                            : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span
+                            className="w-3.5 h-3.5 rounded-full inline-block border border-black/10 shadow-xs"
+                            style={{ backgroundColor: th.primary }}
+                          />
+                          <span
+                            className="w-3.5 h-3.5 rounded-full inline-block border border-black/10 shadow-xs -ml-2"
+                            style={{ backgroundColor: th.secondary }}
+                          />
+                        </div>
+                        <span className="text-[11px] font-bold block text-gray-800 leading-tight">
+                          {th.nama.split(" ")[1] || th.nama}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div className="md:col-span-2">
                   <label className="text-xs font-semibold text-gray-600 block mb-1">URL Logo Toko (Perbesar Tampilan)</label>
@@ -2288,12 +3237,20 @@ export default function App() {
               <p className="text-sm text-gray-500 mb-6">Enterprise Resource Planning (ERP) menyatukan keuangan, rantai pasokan, SDM, manufaktur, dan penjualan ke dalam satu platform terpusat standar industri.</p>
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <div className="bg-gradient-to-br from-pink-50 to-white p-5 rounded-xl border border-pink-200 shadow-xs">
-                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total Valuasi Persediaan</div>
-                  <div className="text-2xl font-bold text-gray-900 mt-1">
-                    Rp {barangList.reduce((acc, b) => acc + (Number(b[6]) * Number(b[3] || 50000)), 0).toLocaleString()}
+                <div className="bg-gradient-to-br from-pink-50 to-white p-5 rounded-xl border border-pink-200 shadow-xs flex flex-col justify-between">
+                  <div>
+                    <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total Valuasi Persediaan</div>
+                    <div className="text-2xl font-bold text-gray-900 mt-1">
+                      Rp {barangList.reduce((acc, b) => acc + (Number(b[6]) * Number(b[3] || 50000)), 0).toLocaleString('id-ID')}
+                    </div>
+                    <div className="text-xs text-pink-600 mt-1 font-medium">Seluruh cabang terintegrasi</div>
                   </div>
-                  <div className="text-xs text-pink-600 mt-1 font-medium">Seluruh cabang terintegrasi</div>
+                  <button 
+                    onClick={() => setShowValuasiModal(true)}
+                    className="mt-3 text-left text-xs text-[#ff3377] hover:text-[#ff1a5c] font-bold flex items-center gap-1 hover:underline"
+                  >
+                    Rincian & Penjelasan Angka 🔍
+                  </button>
                 </div>
                 <div className="bg-gradient-to-br from-purple-50 to-white p-5 rounded-xl border border-purple-200 shadow-xs">
                   <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total Pendapatan Penjualan</div>
@@ -2474,6 +3431,7 @@ export default function App() {
                     <th className="p-3">Rincian Barang & Qty</th>
                     <th className="p-3 text-right">Total Tagihan</th>
                     <th className="p-3 text-center">Status</th>
+                    <th className="p-3 text-center">Dokumen</th>
                     <th className="p-3 text-center">Aksi / Penerimaan</th>
                   </tr>
                 </thead>
@@ -2498,6 +3456,14 @@ export default function App() {
                         }`}>
                           {po.status === 'Received' ? '✓ Diterima' : po.status === 'Cancelled' ? '✕ Dibatalkan' : '⏳ Pending'}
                         </span>
+                      </td>
+                      <td className="p-3 text-center">
+                        <button 
+                          onClick={() => setSelectedPoForSuratJalan(po)}
+                          className="bg-pink-100 hover:bg-pink-200 text-[#ff3377] px-3 py-1.5 rounded-lg text-xs font-bold shadow-xs inline-flex items-center gap-1 transition-colors"
+                        >
+                          📄 PO / Surat Pesanan
+                        </button>
                       </td>
                       <td className="p-3 text-center">
                         {po.status === 'Pending' && (user.role === 'Owner' || user.role === 'Admin Cabang') ? (
@@ -2818,6 +3784,195 @@ export default function App() {
         </div>
       )}
 
+      {/* CUSTOM CONFIRMATION MODAL */}
+      {confirmDialog.isOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] animate-fade-in">
+          <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-md border border-pink-100 animate-in zoom-in-95 duration-150">
+            <h4 className="font-bold text-lg text-gray-900 mb-2 border-b border-pink-100 pb-2 text-[#ff3377] flex items-center gap-2">
+              ⚠️ Konfirmasi Tindakan
+            </h4>
+            <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+              {confirmDialog.message}
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button 
+                onClick={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-xl transition-all"
+              >
+                Batal ✕
+              </button>
+              <button 
+                onClick={handleConfirmAction}
+                className="px-5 py-2 bg-[#ff3377] hover:bg-[#ff1a5c] text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-pink-200"
+              >
+                Ya, Lanjutkan ✓
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CUSTOM VALUASI PERSYARATAN MODAL BREAKDOWN */}
+      {showValuasiModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] animate-fade-in">
+          <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-3xl border border-pink-100 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-150">
+            <div className="flex justify-between items-center mb-4 border-b border-pink-100 pb-3">
+              <h4 className="font-bold text-lg text-[#ff3377] flex items-center gap-2">
+                📊 Rincian Perhitungan Valuasi Persediaan (ERP)
+              </h4>
+              <button 
+                onClick={() => setShowValuasiModal(false)}
+                className="text-gray-400 hover:text-gray-600 text-lg font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="bg-pink-50 border border-pink-200 rounded-xl p-4 mb-4 text-xs text-gray-700 space-y-2 leading-relaxed">
+              <p className="font-bold text-[#ff3377]">
+                💡 Mengapa total valuasi persediaan bernilai Rp 19.885.000?
+              </p>
+              <p>
+                Di dalam sistem akuntansi standar dan modul ERP, <b>Valuasi Persediaan (Inventory Valuation)</b> selalu dihitung berdasarkan <b>Harga Beli / Harga Pokok Pembelian (Cost Price)</b>, bukan Harga Jual (Retail Price).
+              </p>
+              <p>
+                Jika dihitung berdasarkan Harga Jual, maka kita mengantisipasi profit yang belum terealisasikan (karena barang-barang tersebut belum laku terjual ke pembeli). Hal ini melanggar <b>Prinsip Konservatisme Akuntansi</b> karena melebih-lebihkan nilai aset bersih (net assets) perusahaan.
+              </p>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-gray-200 mb-4 max-h-80 overflow-y-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-pink-50 text-gray-700 sticky top-0 font-semibold border-b border-gray-200">
+                  <tr>
+                    <th className="p-3">Cabang Toko</th>
+                    <th className="p-3">Kode</th>
+                    <th className="p-3">Nama Produk</th>
+                    <th className="p-3 text-center">Stok Fisik</th>
+                    <th className="p-3 text-right">Harga Beli (Cost)</th>
+                    <th className="p-3 text-right bg-pink-100/20">Subtotal Valuasi</th>
+                    <th className="p-3 text-right text-gray-400">Harga Jual (Retail)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {barangList.map((b, idx) => {
+                    const stok = Number(b[6] || 0);
+                    const hargaBeli = Number(b[3] || 50000);
+                    const subtotal = stok * hargaBeli;
+                    const hargaJual = Number(b[5] || 0);
+                    return (
+                      <tr key={idx} className="hover:bg-pink-50/20">
+                        <td className="p-3 font-medium text-gray-600">{b[8] || 'Cabang Pusat'}</td>
+                        <td className="p-3 font-mono font-semibold text-[#ff3377]">{b[1]}</td>
+                        <td className="p-3 text-gray-800">{b[2]}</td>
+                        <td className="p-3 text-center font-bold text-gray-900">{stok.toLocaleString('id-ID')}</td>
+                        <td className="p-3 text-right text-gray-700">Rp {hargaBeli.toLocaleString('id-ID')}</td>
+                        <td className="p-3 text-right font-extrabold text-gray-900 bg-pink-100/10">Rp {subtotal.toLocaleString('id-ID')}</td>
+                        <td className="p-3 text-right text-gray-400">Rp {hargaJual.toLocaleString('id-ID')}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot className="bg-pink-50 font-bold text-gray-800 sticky bottom-0 border-t-2 border-pink-200">
+                  <tr>
+                    <td colSpan={3} className="p-3 text-right">TOTAL KONSOLIDASI:</td>
+                    <td className="p-3 text-center text-sm font-extrabold text-[#ff3377]">
+                      {barangList.reduce((sum, b) => sum + Number(b[6] || 0), 0).toLocaleString('id-ID')}
+                    </td>
+                    <td className="p-3"></td>
+                    <td className="p-3 text-right text-sm font-extrabold text-[#ff3377] bg-pink-100/40">
+                      Rp {barangList.reduce((sum, b) => sum + (Number(b[6] || 0) * Number(b[3] || 50000)), 0).toLocaleString('id-ID')}
+                    </td>
+                    <td className="p-3 text-right text-xs text-gray-400">
+                      Rp {barangList.reduce((sum, b) => sum + (Number(b[6] || 0) * Number(b[5] || 0)), 0).toLocaleString('id-ID')} (Jual)
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+              <span className="text-xs text-gray-500 italic">
+                *Stok telah disinkronkan di seluruh cabang.
+              </span>
+              <button 
+                onClick={() => setShowValuasiModal(false)}
+                className="px-5 py-2.5 bg-[#ff3377] hover:bg-[#ff1a5c] text-white text-xs font-semibold rounded-xl transition-all shadow-md shadow-pink-200"
+              >
+                Saya Mengerti, Tutup ✓
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PURCHASE ORDER / SURAT PESANAN SUPPLIER */}
+      {selectedPoForSuratJalan && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] animate-fade-in overflow-y-auto print:hidden">
+          <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-4xl border border-pink-100 max-h-[95vh] overflow-y-auto animate-in zoom-in-95 duration-150">
+            
+            {/* Modal Actions Header */}
+            <div className="flex justify-between items-center mb-4 border-b border-pink-100 pb-3">
+              <h4 className="font-bold text-lg text-[#ff3377] flex items-center gap-2">
+                📄 Dokumen Purchase Order (PO) / Surat Pesanan
+              </h4>
+              <button 
+                onClick={() => setSelectedPoForSuratJalan(null)}
+                className="text-gray-400 hover:text-gray-600 text-lg font-bold p-1 rounded-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Preview Paper */}
+            <div className="max-h-[60vh] overflow-y-auto pr-1">
+              {renderSuratJalanPaper(selectedPoForSuratJalan)}
+            </div>
+
+            {/* Modal Actions Footer */}
+            <div className="flex flex-col sm:flex-row justify-between items-center mt-5 gap-3 pt-3 border-t border-gray-100">
+              <div className="text-left max-w-md">
+                <span className="text-xs text-gray-500 italic block">
+                  *Gunakan tombol cetak untuk mencetak langsung, atau tombol <b>Unduh File Cetak</b> sebagai solusi anti-blokir paling andal.
+                </span>
+                <span className="text-[10px] text-[#ff3377] font-medium block mt-1">
+                  💡 Tips: Unduh File Cetak akan mengunduh file dokumen mandiri (.html) yang otomatis membuka dialog print saat dibuka di komputer/hp Anda!
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2 w-full sm:w-auto shrink-0 justify-end">
+                <button 
+                  onClick={() => setSelectedPoForSuratJalan(null)}
+                  className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-xl transition-all"
+                >
+                  Tutup ✕
+                </button>
+                <button 
+                  onClick={handleDownloadSuratJalanHTML}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-emerald-100 flex items-center justify-center gap-1.5"
+                >
+                  📥 Unduh File Cetak (Sangat Direkomendasikan) ✓
+                </button>
+                <button 
+                  onClick={handlePrintSuratJalan}
+                  className="px-4 py-2.5 bg-[#ff3377] hover:bg-[#ff1a5c] text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-pink-200 flex items-center justify-center gap-1.5"
+                >
+                  🖨️ Cetak Langsung
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
+
+    {/* AREA PRINT KHUSUS PURCHASE ORDER (ONLY VISIBLE ON PRINT) */}
+    {selectedPoForSuratJalan && (
+      <div id="po-print-container" className="hidden print:block bg-white text-gray-800">
+        {renderSuratJalanPaper(selectedPoForSuratJalan)}
+      </div>
+    )}
+
+  </>
   );
 }
