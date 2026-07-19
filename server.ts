@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 
 const app = express();
@@ -7,17 +8,302 @@ const PORT = 3000;
 
 app.use(express.json());
 
-// In-memory database matching the Pinky POS schema
-let db = {
+// Automatically save database on non-GET /api/ requests to prevent data loss on server restart
+app.use((req, res, next) => {
+  res.on("finish", () => {
+    if (req.method !== "GET" && req.path && req.path.startsWith("/api/")) {
+      saveDatabase();
+    }
+  });
+  next();
+});
+
+const DB_FILE = path.join(process.cwd(), "db_store.json");
+
+// Google Sheets Sync Helper Function
+async function syncEntityToSheet(entityName: string, payloadData?: any, bypassEnabledCheck = false) {
+  if (!db.settings.googleSheetUrl) {
+    return { success: false, message: "URL Google Sheets belum dikonfigurasi." };
+  }
+  if (!bypassEnabledCheck && !db.settings.isSheetEnabled) {
+    return { success: false, message: "Sinkronisasi Google Sheets dinonaktifkan di pengaturan." };
+  }
+  
+  let sheetName = "";
+  let headers: string[] = [];
+  let action = "sync_row";
+  let keyIndex = 0;
+  let rowData: any[] = [];
+  let rows: any[][] = [];
+
+  const url = db.settings.googleSheetUrl.trim();
+
+  switch (entityName) {
+    case "transaksi":
+      sheetName = "Transaksi";
+      headers = [
+        "Tanggal & Waktu",
+        "No. Nota",
+        "Email Kasir",
+        "Nama Kasir",
+        "Cabang",
+        "Subtotal",
+        "Diskon",
+        "Pajak",
+        "Total Transaksi",
+        "Metode Pembayaran",
+        "Shift",
+        "Uang Bayar",
+        "Kembalian",
+        "Detail Barang",
+        "Status Sinkronisasi"
+      ];
+      action = "sync_row";
+      keyIndex = 1; // Match by No. Nota
+      
+      const t = payloadData || {};
+      let itemsSummary = "";
+      if (Array.isArray(t.item)) {
+        itemsSummary = t.item.map((it: any) => `${it.nama} (x${it.qty})`).join(", ");
+      } else if (Array.isArray(t[7])) {
+        itemsSummary = t[7].map((it: any) => `${it.nama} (x${it.qty})`).join(", ");
+      }
+      
+      rowData = [
+        new Date(t.timestamp || t[0] || Date.now()).toLocaleString("id-ID"),
+        t.nota || t[1] || "",
+        t.email || t[2] || "",
+        t.kasir || t[3] || "",
+        t.cabang || t[4] || "",
+        Number(t.subtotal || t[8] || 0),
+        Number(t.diskon || t[9] || 0),
+        Number(t.pajak || t[10] || 0),
+        Number(t.total || t[5] || 0),
+        t.metode || t[6] || "",
+        t.shift || "Pagi",
+        Number(t.bayar || t[11] || 0),
+        Number(t.kembalian || t[12] || 0),
+        itemsSummary,
+        "Tersinkronisasi"
+      ];
+      break;
+
+    case "barang":
+      sheetName = "Data Barang";
+      headers = ["ID", "Kode Barang", "Nama Barang", "Harga Beli", "HPP", "Harga Jual", "Stok", "Foto URL", "Cabang"];
+      action = "sync_bulk";
+      rows = db.barang.map((b: any) => [
+        b[0],
+        b[1],
+        b[2],
+        Number(b[3] || 0),
+        Number(b[4] || 0),
+        Number(b[5] || 0),
+        Number(b[6] || 0),
+        b[7],
+        b[8]
+      ]);
+      break;
+
+    case "cabang":
+      sheetName = "Data Cabang";
+      headers = ["ID Cabang", "Nama Cabang", "Alamat"];
+      action = "sync_bulk";
+      rows = db.cabang.map((c: any) => [c[0], c[1], c[2]]);
+      break;
+
+    case "users":
+      sheetName = "Data Staff";
+      headers = ["Email", "Sandi", "Nama Staff", "Role", "Cabang", "Komisi (%)"];
+      action = "sync_bulk";
+      rows = db.users.map((u: any) => [
+        u.email,
+        u.sandi,
+        u.nama,
+        u.role,
+        u.cabang,
+        Number(u.komisiPersen || 0)
+      ]);
+      break;
+
+    case "kasHarian":
+      sheetName = "Kas Harian";
+      headers = ["ID Kas", "Tanggal", "Keterangan", "Tipe", "Jumlah", "Cabang"];
+      action = "sync_bulk";
+      rows = db.kasHarian.map((k: any) => [
+        k.id,
+        new Date(k.tanggal).toLocaleString("id-ID"),
+        k.keterangan,
+        k.tipe,
+        Number(k.jumlah || 0),
+        k.cabang
+      ]);
+      break;
+
+    case "opname":
+      sheetName = "Stok Opname";
+      headers = ["Tanggal", "Cabang", "Kode Barang", "Nama Barang", "Stok Sistem", "Stok Fisik", "Selisih", "Keterangan"];
+      action = "sync_bulk";
+      rows = db.opname.map((o: any) => [
+        new Date(o.timestamp).toLocaleString("id-ID"),
+        o.cabang,
+        o.kode,
+        o.nama,
+        Number(o.sistem || 0),
+        Number(o.fisik || 0),
+        Number(o.selisih || 0),
+        o.ket
+      ]);
+      break;
+
+    case "transfer":
+      sheetName = "Transfer Barang";
+      headers = ["ID Transfer", "Tanggal", "Dari Cabang", "Ke Cabang", "Kode Barang", "Nama Barang", "Qty", "Status", "Pengaju", "Catatan"];
+      action = "sync_bulk";
+      rows = db.transfer.map((tr: any) => [
+        tr.id,
+        new Date(tr.tanggal).toLocaleString("id-ID"),
+        tr.dariCabang,
+        tr.keCabang,
+        tr.kode,
+        tr.nama,
+        Number(tr.qty || 0),
+        tr.status,
+        tr.pengaju,
+        tr.catatan
+      ]);
+      break;
+
+    case "purchaseOrders":
+      sheetName = "Purchase Orders";
+      headers = ["ID PO", "Tanggal", "Supplier", "Cabang", "Detail Items", "Total PO", "Status"];
+      action = "sync_bulk";
+      rows = db.purchaseOrders.map((po: any) => {
+        const poItemsSummary = Array.isArray(po.items) ? po.items.map((it: any) => `${it.nama} (x${it.qty})`).join(", ") : "";
+        return [
+          po.id,
+          new Date(po.tanggal).toLocaleString("id-ID"),
+          po.supplier,
+          po.cabang,
+          poItemsSummary,
+          Number(po.total || 0),
+          po.status
+        ];
+      });
+      break;
+
+    case "ledger":
+      sheetName = "Buku Besar Ledger";
+      headers = ["ID Ledger", "Tanggal", "Akun", "Tipe", "Jumlah", "Cabang", "Referensi"];
+      action = "sync_bulk";
+      rows = db.ledger.map((ld: any) => [
+        ld.id,
+        new Date(ld.tanggal).toLocaleString("id-ID"),
+        ld.akun,
+        ld.tipe,
+        Number(ld.jumlah || 0),
+        ld.cabang,
+        ld.referensi
+      ]);
+      break;
+
+    case "payroll":
+      sheetName = "Payroll Gaji";
+      headers = ["ID Payroll", "Periode", "Nama Pegawai", "Cabang", "Gaji Pokok", "Komisi", "Total Diterima", "Status"];
+      action = "sync_bulk";
+      rows = db.payroll.map((pay: any) => [
+        pay.id,
+        pay.periode,
+        pay.pegawai,
+        pay.cabang,
+        Number(pay.gajiPokok || 0),
+        Number(pay.komisi || 0),
+        Number(pay.totalTerima || 0),
+        pay.status
+      ]);
+      break;
+
+    case "production":
+      sheetName = "Produksi";
+      headers = ["ID Produksi", "Tanggal", "Nama Produk", "Qty Produksi", "Bahan Baku", "Qty Bahan", "Status", "PIC"];
+      action = "sync_bulk";
+      rows = db.production.map((prd: any) => [
+        prd.id,
+        new Date(prd.tanggal).toLocaleString("id-ID"),
+        prd.produk,
+        Number(prd.qtyProduksi || 0),
+        prd.bahanBaku,
+        prd.qtyBahan,
+        prd.status,
+        prd.pic
+      ]);
+      break;
+
+    default:
+      return { success: false, message: "Entitas data tidak didukung." };
+  }
+
+  const payload: any = { action, sheetName, headers };
+  if (action === "sync_row") {
+    payload.rowData = rowData;
+    payload.keyIndex = keyIndex;
+  } else {
+    payload.rows = rows;
+  }
+
+  try {
+    const controller = new AbortController();
+    const idTimeout = setTimeout(() => controller.abort(), 10000); // 10 seconds timeout
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    
+    clearTimeout(idTimeout);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const responseText = await response.text();
+    let resJson: any;
+    try {
+      resJson = JSON.parse(responseText);
+    } catch (e) {
+      if (responseText.includes("<!DOCTYPE") || responseText.includes("<html") || responseText.includes("<script") || responseText.includes("Google Accounts")) {
+        throw new Error("Apps Script mengembalikan halaman HTML/Login. Pastikan setelan deployment 'Who has access' (Siapa yang memiliki akses) diatur ke 'Anyone' (Siapa saja) dan Anda telah memberikan otorisasi akun Google.");
+      }
+      throw new Error(`Respon bukan format JSON valid: ${responseText.slice(0, 100)}...`);
+    }
+
+    if (resJson && resJson.status === "success") {
+      return { success: true, message: resJson.message };
+    } else {
+      return { success: false, message: resJson?.message || "Format respon dari Google Sheets Apps Script tidak valid." };
+    }
+  } catch (error: any) {
+    console.error(`Error syncing ${entityName} to Google Sheet:`, error);
+    return { success: false, message: error.message || "Koneksi terputus atau timeout saat menghubungi Google Sheet." };
+  }
+}
+
+// In-memory default database matching the Pinky POS schema
+const defaultDb = {
   settings: {
     namaToko: "PINKY SHOP",
     alamat: "Jl. Pink Utama No. 88 Jakarta",
     alamatPo: "Jl. Pink Utama No. 88 Jakarta (Kantor Pusat)",
     theme: "sakura",
+    tagline: "Fashion, Retail & Supply Chain Management",
     logoUrl: "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=300",
     pajakPersen: 11,
     diskonMemberPersen: 10,
     footerStruk: "Terima kasih telah berbelanja di Pinky Shop 🌸",
+    googleSheetUrl: "",
+    isSheetEnabled: false,
     rekeningOwner: [
       { id: "bni", bank: "BNI", nomor: "2064972", atasNama: "ROUFI MALY", qrisUrl: "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=BNI-2064972" },
       { id: "bca", bank: "BCA", nomor: "1234567890", atasNama: "Ibu Boss Owner", qrisUrl: "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=BCA-1234567890" },
@@ -77,8 +363,43 @@ let db = {
   ],
   production: [
     { id: "PRD-501", tanggal: Date.now() - 86400000, produk: "Blouse Pink Pastel", qtyProduksi: 30, bahanBaku: "Kain Katun Rayon Pink", qtyBahan: "15 Meter", status: "Completed", pic: "Supervisor Manufaktur" }
-  ]
+  ],
+  kasHarian: [
+    { id: "KAS-1001", tanggal: Date.now() - 3600000 * 24, keterangan: "Saldo Awal Kas Toko", tipe: "Debet", jumlah: 5000000, cabang: "Cabang Pusat" },
+    { id: "KAS-1002", tanggal: Date.now() - 3600000 * 12, keterangan: "Beli Alat Tulis Kantor", tipe: "Kredit", jumlah: 150000, cabang: "Cabang Pusat" }
+  ],
+  googleSheetLogs: [] as any[]
 };
+
+let db = { ...defaultDb };
+
+function saveDatabase() {
+  try {
+    fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), "utf-8");
+  } catch (error) {
+    console.error("Error saving database to file:", error);
+  }
+}
+
+function loadDatabase() {
+  try {
+    if (fs.existsSync(DB_FILE)) {
+      const data = fs.readFileSync(DB_FILE, "utf-8");
+      const parsed = JSON.parse(data);
+      db = { ...defaultDb, ...parsed };
+      db.settings = { ...defaultDb.settings, ...(parsed.settings || {}) };
+      console.log("Database successfully loaded from db_store.json.");
+    } else {
+      console.log("No persistent file found, creating db_store.json.");
+      saveDatabase();
+    }
+  } catch (err) {
+    console.error("Error loading persistent database:", err);
+  }
+}
+
+// Initial load
+loadDatabase();
 
 function syncMasterBarang() {
   const masterMap = new Map();
@@ -94,6 +415,7 @@ function syncMasterBarang() {
     }
   });
 
+  let modified = false;
   db.cabang.forEach((c) => {
     const branchName = c[1];
     masterMap.forEach((info, code) => {
@@ -110,9 +432,14 @@ function syncMasterBarang() {
           info.foto,
           branchName
         ]);
+        modified = true;
       }
     });
   });
+
+  if (modified) {
+    saveDatabase();
+  }
 }
 
 syncMasterBarang();
@@ -150,28 +477,59 @@ app.get("/api/getAwal", (req, res) => {
     payroll: db.payroll,
     production: db.production,
     settings: db.settings,
-    users: db.users
+    users: db.users,
+    kasHarian: db.kasHarian,
+    googleSheetLogs: db.googleSheetLogs
   });
 });
 
+app.post("/api/simpanKasHarian", async (req, res) => {
+  const { tanggal, keterangan, tipe, jumlah, cabang } = req.body;
+  const entry = {
+    id: `KAS-${Date.now().toString().slice(-4)}`,
+    tanggal: Number(tanggal) || Date.now(),
+    keterangan: keterangan || "Catatan Kas",
+    tipe: tipe || "Debet",
+    jumlah: Number(jumlah) || 0,
+    cabang: cabang || "Cabang Pusat"
+  };
+  db.kasHarian.unshift(entry);
+  await syncEntityToSheet("kasHarian");
+  res.json({ s: 1, m: "Catatan kas harian berhasil disimpan!" });
+});
+
+app.post("/api/hapusKasHarian", async (req, res) => {
+  const { id } = req.body;
+  db.kasHarian = db.kasHarian.filter(k => k.id !== id);
+  await syncEntityToSheet("kasHarian");
+  res.json({ s: 1, m: "Catatan kas harian berhasil dihapus." });
+});
+
+app.get("/api/getSettings", (req, res) => {
+  res.json(db.settings);
+});
+
 app.post("/api/updateSettings", (req, res) => {
-  const { namaToko, alamat, alamatPo, theme, logoUrl, pajakPersen, diskonMemberPersen, footerStruk, rekeningOwner, branchOpExpenses } = req.body;
+  const { namaToko, alamat, alamatPo, tagline, theme, logoUrl, pajakPersen, diskonMemberPersen, footerStruk, rekeningOwner, branchOpExpenses, googleSheetUrl, isSheetEnabled } = req.body;
   db.settings = {
     namaToko: namaToko || db.settings.namaToko,
     alamat: alamat || db.settings.alamat,
     alamatPo: alamatPo !== undefined ? alamatPo : db.settings.alamatPo,
     theme: theme || db.settings.theme,
+    tagline: tagline !== undefined ? tagline : db.settings.tagline,
     logoUrl: logoUrl || db.settings.logoUrl,
     pajakPersen: Number(pajakPersen) || 0,
     diskonMemberPersen: Number(diskonMemberPersen) || 0,
     footerStruk: footerStruk || db.settings.footerStruk,
     rekeningOwner: rekeningOwner || db.settings.rekeningOwner,
-    branchOpExpenses: branchOpExpenses || db.settings.branchOpExpenses
+    branchOpExpenses: branchOpExpenses || db.settings.branchOpExpenses,
+    googleSheetUrl: googleSheetUrl !== undefined ? googleSheetUrl : (db.settings.googleSheetUrl || ""),
+    isSheetEnabled: isSheetEnabled !== undefined ? !!isSheetEnabled : !!db.settings.isSheetEnabled
   };
   res.json({ s: 1, m: "Pengaturan toko, rekening & biaya operasional per cabang berhasil diperbarui!" });
 });
 
-app.post("/api/simpanUser", (req, res) => {
+app.post("/api/simpanUser", async (req, res) => {
   const { email, sandi, nama, role, cabang } = req.body;
   const existing = db.users.find(u => u.email === email);
   if (existing) {
@@ -179,20 +537,23 @@ app.post("/api/simpanUser", (req, res) => {
     existing.nama = nama || existing.nama;
     existing.role = role || existing.role;
     existing.cabang = cabang || existing.cabang;
+    await syncEntityToSheet("users");
     res.json({ s: 1, m: "Data staff berhasil diperbarui!" });
   } else {
     db.users.push({ email, sandi: sandi || "123456", nama: nama || "Staff Baru", role: role || "Kasir", cabang: cabang || "Cabang Pusat", komisiPersen: 5 });
+    await syncEntityToSheet("users");
     res.json({ s: 1, m: "Staff baru berhasil ditambahkan!" });
   }
 });
 
-app.post("/api/hapusUser", (req, res) => {
+app.post("/api/hapusUser", async (req, res) => {
   const { email } = req.body;
   db.users = db.users.filter(u => u.email !== email);
+  await syncEntityToSheet("users");
   res.json({ s: 1, m: "Staff berhasil dihapus dari sistem." });
 });
 
-app.post("/api/simpanBarang", (req, res) => {
+app.post("/api/simpanBarang", async (req, res) => {
   const { kode, nama, beli, hpp, jual, stok, foto, cabang, oldKode, branchStokMap, branchHppMap } = req.body;
   const baseKode = kode || `BRG${Date.now().toString().slice(-4)}`;
 
@@ -234,39 +595,47 @@ app.post("/api/simpanBarang", (req, res) => {
     }
   });
 
+  await syncEntityToSheet("barang");
   res.json({ s: 1, m: "Barang berhasil disimpan & HPP serta stok disesuaikan per cabang!" });
 });
 
-app.post("/api/hapusBarang", (req, res) => {
+app.post("/api/hapusBarang", async (req, res) => {
   const { kode } = req.body;
   db.barang = db.barang.filter((b: any) => b[1] !== kode);
+  await syncEntityToSheet("barang");
   res.json({ s: 1, m: "Barang berhasil dihapus dari semua cabang." });
 });
 
-app.post("/api/simpanCabang", (req, res) => {
+app.post("/api/simpanCabang", async (req, res) => {
   const { id, nama, alamat, oldId } = req.body;
   if (oldId) {
     const idx = db.cabang.findIndex(c => c[0] === oldId);
     if (idx !== -1) {
       db.cabang[idx] = [id || oldId, nama, alamat];
+      await syncEntityToSheet("cabang");
       res.json({ s: 1, m: "Data cabang berhasil diperbarui!" });
       return;
     }
   }
   db.cabang.push([id || `CBR${db.cabang.length + 1}`, nama, alamat]);
+  await syncEntityToSheet("cabang");
   res.json({ s: 1, m: "Cabang baru berhasil didaftarkan!" });
 });
 
-app.post("/api/hapusCabang", (req, res) => {
+app.post("/api/hapusCabang", async (req, res) => {
   const { id } = req.body;
   db.cabang = db.cabang.filter(c => c[0] !== id);
+  await syncEntityToSheet("cabang");
   res.json({ s: 1, m: "Cabang berhasil dihapus." });
 });
 
-app.post("/api/simpanTransaksi", (req, res) => {
+app.post("/api/simpanTransaksi", async (req, res) => {
   const { nota, email, kasir, cabang, total, metode, shift, item, subtotal, diskon, pajak, bayar, kembalian } = req.body;
   const timestamp = Date.now();
-  db.transaksi.unshift([timestamp, nota, email, kasir, cabang, total, metode, item, subtotal, diskon, pajak, bayar, kembalian]);
+  
+  // Create transaction with synced flag set to false initially
+  const newTx: any = [timestamp, nota, email, kasir, cabang, total, metode, item, subtotal, diskon, pajak, bayar, kembalian, false, ""];
+  db.transaksi.unshift(newTx);
 
   // Update stock quantities
   if (Array.isArray(item)) {
@@ -281,10 +650,215 @@ app.post("/api/simpanTransaksi", (req, res) => {
     });
   }
 
-  res.json({ s: 1, m: "Transaksi berhasil diproses & dicatat!" });
+  // Auto-sync to Google Sheet if enabled and configured
+  let sheetSyncResult = null;
+  if (db.settings.isSheetEnabled && db.settings.googleSheetUrl) {
+    const syncRes = await syncEntityToSheet("transaksi", {
+      timestamp, nota, email, kasir, cabang, total, metode, shift, item, subtotal, diskon, pajak, bayar, kembalian
+    });
+
+    if (syncRes.success) {
+      newTx[13] = true;
+      newTx[14] = "";
+      sheetSyncResult = { success: true, message: syncRes.message };
+      db.googleSheetLogs.unshift({
+        timestamp: Date.now(),
+        action: "Auto Sync",
+        status: "Success",
+        nota: nota,
+        message: syncRes.message
+      });
+    } else {
+      newTx[13] = false;
+      newTx[14] = syncRes.message;
+      sheetSyncResult = { success: false, message: syncRes.message };
+      db.googleSheetLogs.unshift({
+        timestamp: Date.now(),
+        action: "Auto Sync",
+        status: "Failed",
+        nota: nota,
+        message: syncRes.message
+      });
+    }
+
+    // Auto-sync current stock (barang) to sheet as well
+    await syncEntityToSheet("barang");
+  }
+
+  res.json({ 
+    s: 1, 
+    m: "Transaksi berhasil diproses & dicatat!", 
+    sheetSync: sheetSyncResult,
+    logs: db.googleSheetLogs
+  });
 });
 
-app.post("/api/simpanOpname", (req, res) => {
+// Test Connection Endpoint
+app.post("/api/syncSheetsTest", async (req, res) => {
+  const { url } = req.body;
+  const testUrl = (url || db.settings.googleSheetUrl || "").trim();
+  if (!testUrl) {
+    return res.json({ s: 0, m: "URL Google Sheets belum diatur!" });
+  }
+
+  try {
+    const controller = new AbortController();
+    const idTimeout = setTimeout(() => controller.abort(), 10000); // 10 seconds timeout
+
+    const response = await fetch(testUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "test" }),
+      signal: controller.signal
+    });
+    
+    clearTimeout(idTimeout);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const responseText = await response.text();
+    let data: any;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      if (responseText.includes("<!DOCTYPE") || responseText.includes("<html") || responseText.includes("<script") || responseText.includes("Google Accounts")) {
+        throw new Error("Apps Script mengembalikan halaman HTML/Login. Ini karena setelan deployment 'Who has access' Anda belum diatur ke 'Anyone' (Siapa saja) di Google Apps Script, atau Anda belum menyetujui izin otorisasi akun Google.");
+      }
+      throw new Error(`Format respon salah (Bukan JSON): ${responseText.slice(0, 100)}...`);
+    }
+
+    if (data && data.status === "success") {
+      db.googleSheetLogs.unshift({
+        timestamp: Date.now(),
+        action: "Test Koneksi",
+        status: "Success",
+        nota: "-",
+        message: data.message || "Koneksi Berhasil"
+      });
+      res.json({ s: 1, m: "Koneksi Google Sheet Berhasil! 🌸", logs: db.googleSheetLogs });
+    } else {
+      db.googleSheetLogs.unshift({
+        timestamp: Date.now(),
+        action: "Test Koneksi",
+        status: "Failed",
+        nota: "-",
+        message: data?.message || "Format respon salah"
+      });
+      res.json({ s: 0, m: data?.message || "Koneksi gagal atau format respon Google Sheets salah.", logs: db.googleSheetLogs });
+    }
+  } catch (err: any) {
+    db.googleSheetLogs.unshift({
+      timestamp: Date.now(),
+      action: "Test Koneksi",
+      status: "Failed",
+      nota: "-",
+      message: err.message || "Network error"
+    });
+    res.json({ s: 0, m: `Error koneksi: ${err.message || "Timeout / Tidak dapat terhubung ke Google Sheets"}`, logs: db.googleSheetLogs });
+  }
+});
+
+// Manual Sync All Unsynced Transactions
+app.post("/api/syncSheetsManual", async (req, res) => {
+  if (!db.settings.googleSheetUrl) {
+    return res.json({ s: 0, m: "URL Google Sheets belum diatur!" });
+  }
+
+  let successCount = 0;
+  let failCount = 0;
+  const unsynced: any[] = db.transaksi.filter((t: any) => !t[13]); // Index 13 is isSyncedToSheet
+
+  if (unsynced.length === 0) {
+    return res.json({ s: 1, m: "Semua transaksi sudah tersinkronisasi!", logs: db.googleSheetLogs });
+  }
+
+  for (const t of unsynced) {
+    const result = await syncEntityToSheet("transaksi", t, true);
+    if (result.success) {
+      t[13] = true;
+      t[14] = "";
+      successCount++;
+      db.googleSheetLogs.unshift({
+        timestamp: Date.now(),
+        action: "Manual Sync",
+        status: "Success",
+        nota: t[1],
+        message: "Berhasil disinkronisasi"
+      });
+    } else {
+      t[13] = false;
+      t[14] = result.message;
+      failCount++;
+      db.googleSheetLogs.unshift({
+        timestamp: Date.now(),
+        action: "Manual Sync",
+        status: "Failed",
+        nota: t[1],
+        message: result.message
+      });
+    }
+  }
+
+  // Also sync products
+  await syncEntityToSheet("barang", null, true);
+
+  res.json({
+    s: 1,
+    m: `Sinkronisasi manual selesai! Berhasil: ${successCount} transaksi, Gagal: ${failCount} transaksi.`,
+    logs: db.googleSheetLogs,
+    transaksi: db.transaksi
+  });
+});
+
+// Clear Sheet Logs
+app.post("/api/clearSheetLogs", (req, res) => {
+  db.googleSheetLogs = [];
+  res.json({ s: 1, m: "Log sinkronisasi berhasil dibersihkan!", logs: [] });
+});
+
+// Sync All Master Data Entities
+app.post("/api/syncAllSheets", async (req, res) => {
+  if (!db.settings.googleSheetUrl) {
+    return res.json({ s: 0, m: "URL Google Sheets belum diatur!" });
+  }
+
+  const entities = ["barang", "cabang", "users", "kasHarian", "opname", "transfer", "purchaseOrders", "ledger", "payroll", "production"];
+  let successCount = 0;
+  let failCount = 0;
+
+  for (const entity of entities) {
+    const result = await syncEntityToSheet(entity, null, true);
+    if (result.success) {
+      successCount++;
+      db.googleSheetLogs.unshift({
+        timestamp: Date.now(),
+        action: `Sync Bulk: ${entity}`,
+        status: "Success",
+        nota: "-",
+        message: `Berhasil sinkronisasi tabel ${entity}`
+      });
+    } else {
+      failCount++;
+      db.googleSheetLogs.unshift({
+        timestamp: Date.now(),
+        action: `Sync Bulk: ${entity}`,
+        status: "Failed",
+        nota: "-",
+        message: result.message
+      });
+    }
+  }
+
+  res.json({
+    s: 1,
+    m: `Sinkronisasi semua tabel selesai! Sukses: ${successCount} tabel, Gagal: ${failCount} tabel.`,
+    logs: db.googleSheetLogs
+  });
+});
+
+app.post("/api/simpanOpname", async (req, res) => {
   const { cabang, kode, nama, sistem, fisik, selisih, ket } = req.body;
   db.opname.unshift({ timestamp: Date.now(), cabang, kode, nama, sistem, fisik, selisih, ket });
   
@@ -294,10 +868,13 @@ app.post("/api/simpanOpname", (req, res) => {
     found[6] = Number(fisik);
   }
 
+  await syncEntityToSheet("opname");
+  await syncEntityToSheet("barang");
+
   res.json({ s: 1, m: "Stok Opname berhasil dikirim & stok disesuaikan!" });
 });
 
-app.post("/api/buatTransfer", (req, res) => {
+app.post("/api/buatTransfer", async (req, res) => {
   let { dariCabang, keCabang, kode, nama, qty, catatan, pengaju } = req.body;
   if (!dariCabang || !keCabang || !kode || !qty) {
     return res.json({ s: 0, m: "Data transfer tidak lengkap!" });
@@ -317,10 +894,13 @@ app.post("/api/buatTransfer", (req, res) => {
     pengaju: pengaju || "Staff Cabang",
     catatan: catatan || "-"
   });
+
+  await syncEntityToSheet("transfer");
+
   res.json({ s: 1, m: "Permintaan transfer barang berhasil dikirim ke Pusat untuk approval!" });
 });
 
-app.post("/api/prosesTransfer", (req, res) => {
+app.post("/api/prosesTransfer", async (req, res) => {
   const { id, status } = req.body;
   const transferItem = db.transfer.find((t: any) => t.id === id);
   if (!transferItem) return res.json({ s: 0, m: "Data transfer tidak ditemukan." });
@@ -375,11 +955,14 @@ app.post("/api/prosesTransfer", (req, res) => {
     }
   }
 
+  await syncEntityToSheet("transfer");
+  await syncEntityToSheet("barang");
+
   res.json({ s: 1, m: `Transfer ${id} berhasil ${status === 'Approved' ? 'di-approve & stok berhasil dimutasi antar cabang' : 'ditolak'}!` });
 });
 
 // ERP Purchase Orders (Supply Chain Management)
-app.post("/api/buatPO", (req, res) => {
+app.post("/api/buatPO", async (req, res) => {
   const { supplier, cabang, items, total } = req.body;
   if (!supplier || !cabang || !items) return res.json({ s: 0, m: "Data Purchase Order tidak lengkap!" });
   const id = "PO-" + Math.floor(1000 + Math.random() * 9000);
@@ -404,10 +987,13 @@ app.post("/api/buatPO", (req, res) => {
     referensi: id
   });
 
+  await syncEntityToSheet("purchaseOrders");
+  await syncEntityToSheet("ledger");
+
   res.json({ s: 1, m: `Purchase Order ${id} berhasil diajukan ke supplier ${supplier}!` });
 });
 
-app.post("/api/prosesPO", (req, res) => {
+app.post("/api/prosesPO", async (req, res) => {
   const { id, status } = req.body;
   const po = db.purchaseOrders.find((p: any) => p.id === id);
   if (!po) return res.json({ s: 0, m: "Purchase Order tidak ditemukan." });
@@ -445,19 +1031,26 @@ app.post("/api/prosesPO", (req, res) => {
     });
   }
 
+  await syncEntityToSheet("purchaseOrders");
+  await syncEntityToSheet("ledger");
+  await syncEntityToSheet("barang");
+
   res.json({ s: 1, m: `Purchase Order ${id} berhasil diperbarui statusnya menjadi ${status} & stok otomatis diperbarui!` });
 });
 
 // ERP HR & Payroll Management
-app.post("/api/updateUserCommission", (req, res) => {
+app.post("/api/updateUserCommission", async (req, res) => {
   const { email, komisiPersen } = req.body;
   const targetUser = db.users.find((u: any) => u.email === email);
   if (!targetUser) return res.json({ s: 0, m: "Pegawai tidak ditemukan." });
   targetUser.komisiPersen = Number(komisiPersen) || 0;
+
+  await syncEntityToSheet("users");
+
   res.json({ s: 1, m: `Persentase komisi untuk ${targetUser.nama} berhasil diatur menjadi ${targetUser.komisiPersen}% oleh Owner!` });
 });
 
-app.post("/api/buatPayroll", (req, res) => {
+app.post("/api/buatPayroll", async (req, res) => {
   const { periode, pegawai, cabang, gajiPokok, komisi } = req.body;
   if (!pegawai || !gajiPokok) return res.json({ s: 0, m: "Data payroll tidak lengkap!" });
   const id = "PAY-" + Math.floor(100 + Math.random() * 900);
@@ -486,11 +1079,14 @@ app.post("/api/buatPayroll", (req, res) => {
     referensi: id
   });
 
+  await syncEntityToSheet("payroll");
+  await syncEntityToSheet("ledger");
+
   res.json({ s: 1, m: `Payroll & komisi untuk ${pegawai} berhasil diproses & dicatat dalam buku besar!` });
 });
 
 // ERP Manufacturing / Production (Bill of Materials)
-app.post("/api/buatProduksi", (req, res) => {
+app.post("/api/buatProduksi", async (req, res) => {
   const { produk, qtyProduksi, bahanBaku, qtyBahan, pic } = req.body;
   if (!produk || !qtyProduksi) return res.json({ s: 0, m: "Data produksi tidak lengkap!" });
   const id = "PRD-" + Math.floor(100 + Math.random() * 900);
@@ -511,6 +1107,9 @@ app.post("/api/buatProduksi", (req, res) => {
   if (b) {
     b[6] = Number(b[6]) + Number(qtyProduksi);
   }
+
+  await syncEntityToSheet("production");
+  await syncEntityToSheet("barang");
 
   res.json({ s: 1, m: `Work Order Produksi ${id} selesai! ${qtyProduksi} pcs ${produk} telah ditambahkan ke stok Cabang Pusat.` });
 });

@@ -33,7 +33,9 @@ import {
   Wallet,
   Factory,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Menu,
+  X
 } from 'lucide-react';
 
 function generateQrisPayload(bank: string, nomor: string, atasNama: string, amount: number): string {
@@ -208,19 +210,205 @@ export const THEMES = [
     textColor: "#111827",
     glow: "rgba(17, 24, 39, 0.15)",
     sidebarBg: "#4b5563",
+  },
+  {
+    id: "merahputih",
+    nama: "🇮🇩 Merah Putih (Corporate Indonesia)",
+    primary: "#d32f2f",
+    primaryHover: "#990000",
+    secondary: "#e53935",
+    secondaryHover: "#b71c1c",
+    bg: "#fff8f8",
+    lightTint: "#ffebee",
+    borderTint: "#ffcdd2",
+    textColor: "#d32f2f",
+    glow: "rgba(211, 47, 47, 0.15)",
+    sidebarBg: "#d32f2f",
   }
 ];
 
+function hexToRgb(hex: string): string {
+  const cleaned = hex.replace(/^#/, '');
+  const bigint = parseInt(cleaned, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `${r}, ${g}, ${b}`;
+}
+
+export const MS_OFFICE_THEME_COLORS = [
+  ["#ffffff", "#000000", "#e7e6e6", "#44546a", "#5b9bd5", "#ed7d31", "#a5a5a5", "#ffc000", "#4472c4", "#70ad47"],
+  ["#f2f2f2", "#7f7f7f", "#d2d2d2", "#d9e1f2", "#ddebf7", "#fce4d6", "#ededed", "#fff2cc", "#d9e1f2", "#e2efda"],
+  ["#d9d9d9", "#595959", "#b3b3b3", "#b4c6e7", "#bdd7ee", "#f8cbad", "#dbdbdb", "#ffe699", "#b4c6e7", "#c6e0b4"],
+  ["#bfbfbf", "#3f3f3f", "#808080", "#8ea9db", "#9bc2e6", "#f4b084", "#c9c9c9", "#ffd966", "#8ea9db", "#a9d08e"],
+  ["#a6a6a6", "#262626", "#404040", "#305496", "#2f75b5", "#c65911", "#7b7b7b", "#bf8f00", "#305496", "#375623"],
+  ["#7f7f7f", "#0c0c0c", "#1a1a1a", "#203764", "#1f4e78", "#833c0c", "#525252", "#806000", "#203764", "#253b19"]
+];
+
+export const MS_OFFICE_STANDARD_ROW = [
+  "#c00000",
+  "#ff0000",
+  "#ffc000",
+  "#ffff00",
+  "#92d050",
+  "#00b050",
+  "#00b0f0",
+  "#0070c0",
+  "#002060",
+  "#7030a0"
+];
+
+function darkenColor(hex: string, percent: number): string {
+  try {
+    const num = parseInt(hex.replace("#", ""), 16),
+          amt = Math.round(2.55 * percent),
+          R = (num >> 16) - amt,
+          G = (num >> 8 & 0x00FF) - amt,
+          B = (num & 0x0000FF) - amt;
+    return "#" + (0x1000000 + (R < 255 ? R < 0 ? 0 : R : 255) * 0x10000 + (G < 255 ? G < 0 ? 0 : G : 255) * 0x100 + (B < 255 ? B < 0 ? 0 : B : 255)).toString(16).slice(1);
+  } catch (e) {
+    return hex;
+  }
+}
+
+function mixWithWhite(hex: string, ratio: number): string {
+  try {
+    const r = parseInt(hex.substring(1, 3), 16);
+    const g = parseInt(hex.substring(3, 5), 16);
+    const b = parseInt(hex.substring(5, 7), 16);
+    
+    const mixedR = Math.round(r * ratio + 255 * (1 - ratio));
+    const mixedG = Math.round(g * ratio + 255 * (1 - ratio));
+    const mixedB = Math.round(b * ratio + 255 * (1 - ratio));
+    
+    const toHex = (c: number) => {
+      const s = c.toString(16);
+      return s.length === 1 ? "0" + s : s;
+    };
+    return `#${toHex(mixedR)}${toHex(mixedG)}${toHex(mixedB)}`;
+  } catch (e) {
+    return hex;
+  }
+}
+
+function getThemeObj(themeId: string): typeof THEMES[0] {
+  if (themeId && themeId.startsWith('custom_')) {
+    const parts = themeId.split('_');
+    const primary = parts[1] || '#ff3377';
+    const secondary = parts[2] || '#ff6699';
+    
+    const primaryHover = darkenColor(primary, 15);
+    const secondaryHover = darkenColor(secondary, 15);
+    
+    const bg = mixWithWhite(primary, 0.04);
+    const lightTint = mixWithWhite(primary, 0.12);
+    const borderTint = mixWithWhite(primary, 0.25);
+    
+    return {
+      id: themeId,
+      nama: "🎨 Kustom (More Colors)",
+      primary: primary,
+      primaryHover: primaryHover,
+      secondary: secondary,
+      secondaryHover: secondaryHover,
+      bg: bg,
+      lightTint: lightTint,
+      borderTint: borderTint,
+      textColor: primary,
+      glow: `rgba(${hexToRgb(primary)}, 0.15)`,
+      sidebarBg: secondary,
+    };
+  }
+  return THEMES.find(t => t.id === themeId) || THEMES[0];
+}
+
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const saved = localStorage.getItem('pinky_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'pos' | 'barang' | 'opname' | 'laporan' | 'audit' | 'cabang' | 'staff' | 'settings' | 'panduan' | 'transfer' | 'erp' | 'ledger' | 'po' | 'payroll' | 'production'>('pos');
+  const [activeTab, setActiveTab] = useState<'pos' | 'barang' | 'opname' | 'laporan' | 'audit' | 'cabang' | 'staff' | 'settings' | 'panduan' | 'transfer' | 'erp' | 'ledger' | 'po' | 'payroll' | 'production'>(() => {
+    try {
+      const hash = window.location.hash.replace('#', '');
+      const validTabs = ['pos', 'barang', 'opname', 'laporan', 'audit', 'cabang', 'staff', 'settings', 'panduan', 'transfer', 'erp', 'ledger', 'po', 'payroll', 'production'];
+      if (validTabs.includes(hash)) {
+        return hash as any;
+      }
+      const saved = localStorage.getItem('pinky_active_tab');
+      return (saved as any) || 'pos';
+    } catch {
+      return 'pos';
+    }
+  });
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (user) {
+        localStorage.setItem('pinky_user', JSON.stringify(user));
+      } else {
+        localStorage.removeItem('pinky_user');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) {
+        setIsSidebarCollapsed(true);
+      }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const handleNavSelect = (tab: 'pos' | 'barang' | 'opname' | 'laporan' | 'audit' | 'cabang' | 'staff' | 'settings' | 'panduan' | 'transfer' | 'erp' | 'ledger' | 'po' | 'payroll' | 'production') => {
+    setActiveTab(tab);
+    try {
+      localStorage.setItem('pinky_active_tab', tab);
+      window.location.hash = tab;
+    } catch (e) {
+      console.error(e);
+    }
+    if (isMobile) {
+      setIsSidebarCollapsed(true);
+    }
+  };
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      const validTabs = ['pos', 'barang', 'opname', 'laporan', 'audit', 'cabang', 'staff', 'settings', 'panduan', 'transfer', 'erp', 'ledger', 'po', 'payroll', 'production'];
+      if (validTabs.includes(hash)) {
+        setActiveTab(hash as any);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    
+    // Sync hash on mount if none exists
+    if (!window.location.hash && activeTab) {
+      window.location.hash = activeTab;
+    }
+
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [activeTab]);
   
   const [settings, setSettings] = useState({
     namaToko: "PINKY SHOP",
     alamat: "Jl. Pink Utama No. 88 Jakarta",
     alamatPo: "Jl. Pink Utama No. 88 Jakarta (Kantor Pusat)",
+    tagline: "Fashion, Retail & Supply Chain Management",
     theme: "sakura",
     logoUrl: "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=300",
     pajakPersen: 11,
@@ -233,7 +421,10 @@ export default function App() {
     ] as Rekening[]
   });
 
-  const currentTheme = THEMES.find(t => t.id === (settings.theme || 'sakura')) || THEMES[0];
+  const currentTheme = getThemeObj(settings.theme || 'sakura');
+  
+  const [customPrimary, setCustomPrimary] = useState('#ff3377');
+  const [customSecondary, setCustomSecondary] = useState('#ff6699');
   
   // Login form state
   const [emailInput, setEmailInput] = useState('owner@usaha.com');
@@ -251,6 +442,14 @@ export default function App() {
   const [payrollList, setPayrollList] = useState<any[]>([]);
   const [productionList, setProductionList] = useState<any[]>([]);
   const [usersList, setUsersList] = useState<any[]>([]);
+  const [kasHarianList, setKasHarianList] = useState<any[]>([]);
+
+  // Kas Harian Form State
+  const [newKasKeterangan, setNewKasKeterangan] = useState('');
+  const [newKasTipe, setNewKasTipe] = useState<'Debet' | 'Kredit'>('Debet');
+  const [newKasJumlah, setNewKasJumlah] = useState('');
+  const [newKasCabang, setNewKasCabang] = useState('Cabang Pusat');
+  const [newKasTanggal, setNewKasTanggal] = useState(new Date().toISOString().split('T')[0]);
 
   // ERP Forms
   const [poSupplier, setPoSupplier] = useState('');
@@ -284,12 +483,137 @@ export default function App() {
   const [setNamaToko, setSetNamaToko] = useState('');
   const [setAlamat, setSetAlamat] = useState('');
   const [setAlamatPo, setSetAlamatPo] = useState('');
+  const [setTagline, setSetTagline] = useState('');
   const [setTheme, setSetTheme] = useState('sakura');
   const [setLogoUrl, setSetLogoUrl] = useState('');
   const [setPajak, setSetPajak] = useState('');
   const [setDiskonMember, setSetDiskonMember] = useState('');
   const [setFooter, setSetFooter] = useState('');
   const [rekeningList, setRekeningList] = useState<Rekening[]>([]);
+
+  // Google Sheets Integration States
+  const [googleSheetUrl, setGoogleSheetUrlState] = useState('');
+  const [isSheetEnabled, setIsSheetEnabledState] = useState(false);
+  const [sheetLogs, setSheetLogs] = useState<any[]>([]);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
+  const [isTestingConn, setIsTestingConn] = useState(false);
+
+  useEffect(() => {
+    if (setTheme.startsWith('custom_')) {
+      const nextCustomTheme = `custom_${customPrimary}_${customSecondary}`;
+      if (setTheme !== nextCustomTheme) {
+        setSetTheme(nextCustomTheme);
+      }
+    }
+  }, [customPrimary, customSecondary, setTheme]);
+
+  const fetchSettingsOnly = async () => {
+    try {
+      const res = await fetch('/api/getSettings');
+      const data = await res.json();
+      if (data) {
+        setSettings(data);
+        setSetNamaToko(data.namaToko);
+        setSetAlamat(data.alamat);
+        setSetAlamatPo(data.alamatPo || data.alamat || '');
+        setSetTagline(data.tagline || 'Fashion, Retail & Supply Chain Management');
+        const loadedTheme = data.theme || 'sakura';
+        setSetTheme(loadedTheme);
+        if (loadedTheme.startsWith('custom_')) {
+          const parts = loadedTheme.split('_');
+          setCustomPrimary(parts[1] || '#ff3377');
+          setCustomSecondary(parts[2] || '#ff6699');
+        }
+        setSetLogoUrl(data.logoUrl);
+        setSetPajak(String(data.pajakPersen));
+        setSetDiskonMember(String(data.diskonMemberPersen));
+        setSetFooter(data.footerStruk);
+        if (data.rekeningOwner) {
+          setRekeningList(data.rekeningOwner);
+        }
+        if (data.branchOpExpenses) {
+          setBranchOpExpenses(data.branchOpExpenses);
+        }
+        setGoogleSheetUrlState(data.googleSheetUrl || '');
+        setIsSheetEnabledState(!!data.isSheetEnabled);
+      }
+    } catch (e) {
+      console.error("Gagal memuat settings", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchSettingsOnly();
+  }, []);
+
+  const syncOfflineTransactions = async () => {
+    try {
+      const saved = localStorage.getItem('pinky_offline_transactions');
+      if (!saved) return;
+      const queue = JSON.parse(saved);
+      if (!Array.isArray(queue) || queue.length === 0) return;
+
+      console.log(`Menyinkronkan ${queue.length} transaksi offline...`);
+      setIsSyncing(true);
+      
+      const remaining: any[] = [];
+      let successCount = 0;
+
+      for (const tx of queue) {
+        try {
+          const res = await fetch('/api/simpanTransaksi', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(tx)
+          });
+          const data = await res.json();
+          if (data.s === 1) {
+            successCount++;
+          } else {
+            remaining.push(tx);
+          }
+        } catch (err) {
+          remaining.push(tx);
+        }
+      }
+
+      if (remaining.length > 0) {
+        localStorage.setItem('pinky_offline_transactions', JSON.stringify(remaining));
+      } else {
+        localStorage.removeItem('pinky_offline_transactions');
+      }
+
+      setIsSyncing(false);
+      if (successCount > 0) {
+        fetchData();
+        console.log(`Berhasil menyinkronkan ${successCount} transaksi offline!`);
+      }
+    } catch (e) {
+      console.error("Error syncing offline transactions", e);
+      setIsSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    // Initial sync
+    syncOfflineTransactions();
+
+    // Event listeners
+    window.addEventListener('online', syncOfflineTransactions);
+    
+    // Interval check every 30 seconds
+    const interval = setInterval(() => {
+      if (navigator.onLine) {
+        syncOfflineTransactions();
+      }
+    }, 30000);
+
+    return () => {
+      window.removeEventListener('online', syncOfflineTransactions);
+      clearInterval(interval);
+    };
+  }, []);
 
   // New Bank Account Form
   const [newBank, setNewBank] = useState('');
@@ -342,6 +666,7 @@ export default function App() {
   const [reportBranchFilter, setReportBranchFilter] = useState('ALL');
   const [reportPeriodFilter, setReportPeriodFilter] = useState('ALL'); // ALL, daily, monthly, yearly
 
+
   // Transfer state
   const [trfDariCabang, setTrfDariCabang] = useState('');
   const [trfKeCabang, setTrfKeCabang] = useState('');
@@ -354,7 +679,7 @@ export default function App() {
     isOpen: boolean;
     title: string;
     message: string;
-    type: 'delete_barang' | 'delete_branch' | 'delete_staff' | 'process_po' | 'process_transfer' | null;
+    type: 'delete_barang' | 'delete_branch' | 'delete_staff' | 'process_po' | 'process_transfer' | 'delete_kas_harian' | null;
     payload: any;
   }>({
     isOpen: false,
@@ -367,7 +692,7 @@ export default function App() {
   const triggerConfirm = (
     title: string, 
     message: string, 
-    type: 'delete_barang' | 'delete_branch' | 'delete_staff' | 'process_po' | 'process_transfer',
+    type: 'delete_barang' | 'delete_branch' | 'delete_staff' | 'process_po' | 'process_transfer' | 'delete_kas_harian',
     payload: any
   ) => {
     setConfirmDialog({
@@ -434,6 +759,19 @@ export default function App() {
           console.warn("window.alert is blocked/unavailable.", alertErr);
         }
         fetchData();
+      } else if (type === 'delete_kas_harian') {
+        const res = await fetch('/api/hapusKasHarian', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: payload.id })
+        });
+        const data = await res.json();
+        try {
+          alert(data.m);
+        } catch (err) {
+          console.warn("window.alert is blocked/unavailable.", err);
+        }
+        fetchData();
       }
     } catch (e) {
       console.error(e);
@@ -454,6 +792,7 @@ export default function App() {
     const po = selectedPoForSuratJalan;
     const storeName = settings.namaToko || "PINKY POS & BOUTIQUE";
     const storeAddress = settings.alamatPo || settings.alamat || "Jl. Merdeka No. 45, Kebayoran Baru, Jakarta Selatan";
+    const storeTagline = settings.tagline || "Fashion, Retail & Supply Chain Management";
     const storeLogoHtml = settings.logoUrl 
       ? `<img src="${settings.logoUrl}" alt="Logo Toko" style="width: 64px; height: 64px; object-fit: cover; border-radius: 12px; border: 1px solid #fbcfe8; flex-shrink: 0;" />`
       : '';
@@ -528,7 +867,7 @@ export default function App() {
                   <h2 class="text-2xl font-black text-gray-900 tracking-tight uppercase" style="font-weight: 900; font-size: 1.5rem; margin: 0;">
                     ${storeName}
                   </h2>
-                  <p class="text-xs font-semibold text-pink-600 uppercase tracking-widest mt-0.5" style="font-size: 0.75rem; letter-spacing: 0.1em; color: #db2777; font-weight: 600; margin: 0;">Fashion, Retail & Supply Chain Management</p>
+                  <p class="text-xs font-semibold text-pink-600 uppercase tracking-widest mt-0.5" style="font-size: 0.75rem; letter-spacing: 0.1em; color: #db2777; font-weight: 600; margin: 0;">${storeTagline}</p>
                   <p class="text-xs text-gray-500 mt-1 max-w-md" style="font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem;">${storeAddress}</p>
                 </div>
               </div>
@@ -675,7 +1014,7 @@ export default function App() {
               <h2 className="text-2xl font-black text-gray-900 tracking-tight uppercase">
                 {settings.namaToko || "PINKY POS & BOUTIQUE"}
               </h2>
-              <p className="text-xs font-semibold text-pink-600 uppercase tracking-widest mt-0.5">Fashion, Retail & Supply Chain Management</p>
+              <p className="text-xs font-semibold text-pink-600 uppercase tracking-widest mt-0.5">{settings.tagline || "Fashion, Retail & Supply Chain Management"}</p>
               <p className="text-xs text-gray-500 mt-1 max-w-md">{settings.alamatPo || settings.alamat || "Jl. Merdeka No. 45, Kebayoran Baru, Jakarta Selatan"}</p>
             </div>
           </div>
@@ -827,12 +1166,20 @@ export default function App() {
       setPayrollList(data.payroll || []);
       setProductionList(data.production || []);
       setUsersList(data.users || []);
+      setKasHarianList(data.kasHarian || []);
       if (data.settings) {
         setSettings(data.settings);
         setSetNamaToko(data.settings.namaToko);
         setSetAlamat(data.settings.alamat);
         setSetAlamatPo(data.settings.alamatPo || data.settings.alamat || '');
-        setSetTheme(data.settings.theme || 'sakura');
+        setSetTagline(data.settings.tagline || 'Fashion, Retail & Supply Chain Management');
+        const loadedTheme = data.settings.theme || 'sakura';
+        setSetTheme(loadedTheme);
+        if (loadedTheme.startsWith('custom_')) {
+          const parts = loadedTheme.split('_');
+          setCustomPrimary(parts[1] || '#ff3377');
+          setCustomSecondary(parts[2] || '#ff6699');
+        }
         setSetLogoUrl(data.settings.logoUrl);
         setSetPajak(String(data.settings.pajakPersen));
         setSetDiskonMember(String(data.settings.diskonMemberPersen));
@@ -843,6 +1190,11 @@ export default function App() {
         if (data.settings.branchOpExpenses) {
           setBranchOpExpenses(data.settings.branchOpExpenses);
         }
+        setGoogleSheetUrlState(data.settings.googleSheetUrl || '');
+        setIsSheetEnabledState(!!data.settings.isSheetEnabled);
+      }
+      if (data.googleSheetLogs) {
+        setSheetLogs(data.googleSheetLogs);
       }
     } catch (e) {
       console.error("Gagal memuat data", e);
@@ -934,18 +1286,40 @@ export default function App() {
         body: JSON.stringify(payload)
       });
       const data = await res.json();
-      if (data.s === 1) {
+      if (res.ok && data.s === 1) {
         setLastReceipt({ ...payload, timestamp: Date.now() });
         setShowStrukModal(true);
         setCart([]);
         setUangBayar(0);
         setIsMember(false);
         fetchData();
+        
+        if (data.sheetSync && !data.sheetSync.success) {
+          console.warn("Google Sheet sync failed on backend:", data.sheetSync.message);
+        }
       } else {
-        alert("Gagal memproses transaksi");
+        throw new Error(data.m || "Gagal memproses transaksi");
       }
-    } catch (e) {
-      alert("Error saat menyimpan transaksi");
+    } catch (e: any) {
+      console.error("Gagal simpan transaksi ke server. Menyimpan ke offline queue...", e);
+      try {
+        const saved = localStorage.getItem('pinky_offline_transactions');
+        const queue = saved ? JSON.parse(saved) : [];
+        const enrichedPayload = { ...payload, timestamp: Date.now(), isOffline: true };
+        queue.push(enrichedPayload);
+        localStorage.setItem('pinky_offline_transactions', JSON.stringify(queue));
+        
+        setLastReceipt(enrichedPayload);
+        setShowStrukModal(true);
+        setCart([]);
+        setUangBayar(0);
+        setIsMember(false);
+        
+        alert("⚠️ POS OFFLINE/TERPUTUS! Transaksi Anda telah disimpan dalam antrean offline lokal. Struk struk tetap dapat dicetak, dan data transaksi akan disinkronkan ke server secara otomatis saat internet kembali online.");
+      } catch (errLocal) {
+        console.error("Error offline storage:", errLocal);
+        alert("Error kritis: Gagal menyimpan transaksi baik ke server maupun memori offline lokal.");
+      }
     }
   };
 
@@ -1070,13 +1444,16 @@ export default function App() {
           namaToko: setNamaToko,
           alamat: setAlamat,
           alamatPo: setAlamatPo,
+          tagline: setTagline,
           theme: setTheme,
           logoUrl: setLogoUrl,
           pajakPersen: setPajak,
           diskonMemberPersen: setDiskonMember,
           footerStruk: setFooter,
           rekeningOwner: rekeningList,
-          branchOpExpenses: branchOpExpenses
+          branchOpExpenses: branchOpExpenses,
+          googleSheetUrl: googleSheetUrl,
+          isSheetEnabled: isSheetEnabled
         })
       });
       const data = await res.json();
@@ -1084,6 +1461,87 @@ export default function App() {
       fetchData();
     } catch (err) {
       alert("Gagal memperbarui pengaturan");
+    }
+  };
+
+  const handleTestSheetConnection = async () => {
+    if (!googleSheetUrl) return alert("Harap isi URL Google Sheets terlebih dahulu!");
+    setIsTestingConn(true);
+    try {
+      const res = await fetch('/api/syncSheetsTest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: googleSheetUrl })
+      });
+      const data = await res.json();
+      if (data.s === 1) {
+        alert("Sukses! " + data.m);
+      } else {
+        alert("Gagal: " + data.m);
+      }
+      if (data.logs) {
+        setSheetLogs(data.logs);
+      }
+    } catch (err: any) {
+      alert("Gagal menghubungi server atau Google Sheets: " + err.message);
+    } finally {
+      setIsTestingConn(false);
+    }
+  };
+
+  const handleManualSheetSync = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await fetch('/api/syncSheetsManual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      alert(data.m);
+      if (data.logs) {
+        setSheetLogs(data.logs);
+      }
+      if (data.transaksi) {
+        setTransaksiList(data.transaksi);
+      }
+    } catch (err: any) {
+      alert("Gagal menghubungi server: " + err.message);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleSyncAllMasterData = async () => {
+    setIsSyncingAll(true);
+    try {
+      const res = await fetch('/api/syncAllSheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      alert(data.m);
+      if (data.logs) {
+        setSheetLogs(data.logs);
+      }
+    } catch (err: any) {
+      alert("Gagal menghubungi server: " + err.message);
+    } finally {
+      setIsSyncingAll(false);
+    }
+  };
+
+  const handleClearSheetLogs = async () => {
+    try {
+      const res = await fetch('/api/clearSheetLogs', {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (data.s === 1) {
+        setSheetLogs([]);
+        alert(data.m);
+      }
+    } catch (err: any) {
+      alert("Gagal membersihkan log: " + err.message);
     }
   };
 
@@ -1150,6 +1608,47 @@ export default function App() {
       `Apakah Anda yakin ingin menghapus akun staff dengan email ${email}? Tindakan ini tidak dapat dibatalkan.`,
       'delete_staff',
       { email }
+    );
+  };
+
+  const handleSimpanKasHarian = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newKasKeterangan || !newKasJumlah) {
+      alert("Harap isi Keterangan dan Jumlah Kas.");
+      return;
+    }
+    try {
+      const res = await fetch('/api/simpanKasHarian', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tanggal: new Date(newKasTanggal).getTime(),
+          keterangan: newKasKeterangan,
+          tipe: newKasTipe,
+          jumlah: Number(newKasJumlah),
+          cabang: user?.role === 'Owner' ? newKasCabang : user?.cabang
+        })
+      });
+      const data = await res.json();
+      if (data.s) {
+        setNewKasKeterangan('');
+        setNewKasJumlah('');
+        fetchData();
+      } else {
+        alert(data.m);
+      }
+    } catch (err) {
+      console.error("Gagal menyimpan kas harian", err);
+      alert("Gagal menyimpan kas harian");
+    }
+  };
+
+  const handleHapusKasHarianEntry = (id: string) => {
+    triggerConfirm(
+      'Hapus Kas Harian',
+      'Apakah Anda yakin ingin menghapus catatan kas harian ini?',
+      'delete_kas_harian',
+      { id }
     );
   };
 
@@ -1417,12 +1916,12 @@ export default function App() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#fff0f5] flex items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center border border-pink-100">
+      <div className="min-h-screen flex items-center justify-center p-4 transition-all duration-300" style={{ backgroundColor: currentTheme.bg }}>
+        <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center border transition-all" style={{ borderColor: currentTheme.lightTint }}>
           <div className="mb-4">
-            <img src={settings.logoUrl} alt="Logo" className="w-24 h-24 rounded-full object-cover mx-auto shadow-md border-2 border-pink-300" referrerPolicy="no-referrer" />
+            <img src={settings.logoUrl} alt="Logo" className="w-24 h-24 rounded-full object-cover mx-auto shadow-md border-2 transition-all" style={{ borderColor: currentTheme.lightTint }} referrerPolicy="no-referrer" />
           </div>
-          <h2 className="text-2xl font-bold text-[#ff3377] mb-2 tracking-tight">🌸 {settings.namaToko} 🌸</h2>
+          <h2 className="text-2xl font-bold mb-2 tracking-tight transition-all" style={{ color: currentTheme.primary }}>🌸 {settings.namaToko} 🌸</h2>
           <p className="text-gray-500 text-sm mb-6">Sistem Kasir POS & Manajemen Butik Multi-Cabang</p>
           
           <form onSubmit={handleLogin} className="space-y-4 text-left">
@@ -1432,7 +1931,8 @@ export default function App() {
                 type="email" 
                 value={emailInput} 
                 onChange={e => setEmailInput(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff6699] focus:outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:outline-none transition-all"
+                style={{ '--tw-ring-color': currentTheme.primary } as React.CSSProperties}
                 placeholder="email@usaha.com"
                 required
               />
@@ -1443,7 +1943,8 @@ export default function App() {
                 type="password" 
                 value={sandiInput} 
                 onChange={e => setSandiInput(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff6699] focus:outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:outline-none transition-all"
+                style={{ '--tw-ring-color': currentTheme.primary } as React.CSSProperties}
                 placeholder="******"
                 required
               />
@@ -1453,7 +1954,8 @@ export default function App() {
               <select 
                 value={shiftInput} 
                 onChange={e => setShiftInput(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff6699] focus:outline-none bg-white"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:outline-none bg-white transition-all"
+                style={{ '--tw-ring-color': currentTheme.primary } as React.CSSProperties}
               >
                 <option value="Pagi">Shift Pagi (08:00 - 15:00)</option>
                 <option value="Siang">Shift Siang (15:00 - 22:00)</option>
@@ -1463,7 +1965,8 @@ export default function App() {
             <button 
               type="submit" 
               disabled={loading}
-              className="w-full bg-[#ff6699] hover:bg-[#ff3377] text-white font-medium py-3 rounded-lg shadow-md transition-all flex items-center justify-center gap-2 mt-2"
+              className="w-full text-white font-medium py-3 rounded-lg shadow-md transition-all flex items-center justify-center gap-2 mt-2 opacity-95 hover:opacity-100"
+              style={{ backgroundColor: currentTheme.primary }}
             >
               {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : "Masuk & Catat Jam Masuk 📝"}
             </button>
@@ -1606,20 +2109,44 @@ export default function App() {
         .toggle-btn-theme:hover {
           background-color: var(--primary-hover) !important;
         }
+        
+        /* Navigation button styles */
         .nav-btn-active {
-          background-color: var(--primary-color) !important;
+          background-color: rgba(0, 0, 0, 0.22) !important; /* warna lebih tua dari background sidebar */
           color: #ffffff !important;
-          box-shadow: 0 4px 6px -1px var(--glow), 0 2px 4px -1px var(--glow) !important;
+          border-left: 4px solid #ffffff !important;
+          padding-left: 12px !important; /* adjust padding to balance the border */
+          border-radius: 0 8px 8px 0 !important; /* elegant asymmetric rounding */
+          box-shadow: inset 2px 0 5px rgba(0, 0, 0, 0.15) !important;
         }
         .nav-btn-inactive {
           background-color: transparent !important;
           color: rgba(255, 255, 255, 0.85) !important;
+          border-left: 4px solid transparent !important;
           box-shadow: none !important;
         }
         .nav-btn-inactive:hover {
-          background-color: rgba(0, 0, 0, 0.12) !important;
+          background-color: rgba(0, 0, 0, 0.12) !important; /* hover warna lebih gelap */
+          color: #ffffff !important;
+          border-left: 4px solid rgba(255, 255, 255, 0.4) !important;
+        }
+
+        /* Highly attractive icon styles for left side icons inside buttons */
+        .nav-btn-active svg {
+          transform: scale(1.22) !important;
+          filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.8)) !important;
+          color: #ffffff !important;
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .nav-btn-inactive svg {
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          color: rgba(255, 255, 255, 0.8) !important;
+        }
+        .nav-btn-inactive:hover svg {
+          transform: scale(1.1) !important;
           color: #ffffff !important;
         }
+
         .nav-category-header {
           color: var(--light-tint) !important;
           opacity: 0.95;
@@ -1676,7 +2203,7 @@ export default function App() {
           background-color: var(--primary-color) !important;
         }
         .hover\:bg-\[\#ff6699\]\/60:hover {
-          background-color: rgba(${currentTheme.id === 'sakura' ? '255, 102, 153' : currentTheme.id === 'emerald' ? '16, 185, 129' : currentTheme.id === 'ocean' ? '59, 130, 246' : currentTheme.id === 'amethyst' ? '139, 92, 246' : currentTheme.id === 'sunset' ? '249, 115, 22' : '75, 85, 99'}, 0.6) !important;
+          background-color: rgba(${hexToRgb(currentTheme.secondary)}, 0.6) !important;
         }
         .bg-\[\#fff0f5\] {
           background-color: var(--bg-color) !important;
@@ -1714,16 +2241,16 @@ export default function App() {
           background-color: var(--light-tint) !important;
         }
         .hover\:bg-\[\#ffebf0\]\/80:hover {
-          background-color: rgba(${currentTheme.id === 'sakura' ? '255, 102, 153' : currentTheme.id === 'emerald' ? '16, 185, 129' : currentTheme.id === 'ocean' ? '59, 130, 246' : currentTheme.id === 'amethyst' ? '139, 92, 246' : currentTheme.id === 'sunset' ? '249, 115, 22' : '75, 85, 99'}, 0.15) !important;
+          background-color: rgba(${hexToRgb(currentTheme.primary)}, 0.15) !important;
         }
         .bg-\[\#ffd1df\] {
           background-color: var(--light-tint) !important;
         }
         .bg-\[\#ffd1df\]\/20 {
-          background-color: rgba(${currentTheme.id === 'sakura' ? '255, 102, 153' : currentTheme.id === 'emerald' ? '16, 185, 129' : currentTheme.id === 'ocean' ? '59, 130, 246' : currentTheme.id === 'amethyst' ? '139, 92, 246' : currentTheme.id === 'sunset' ? '249, 115, 22' : '75, 85, 99'}, 0.1) !important;
+          background-color: rgba(${hexToRgb(currentTheme.primary)}, 0.1) !important;
         }
         .bg-\[\#ffd1df\]\/10 {
-          background-color: rgba(${currentTheme.id === 'sakura' ? '255, 102, 153' : currentTheme.id === 'emerald' ? '16, 185, 129' : currentTheme.id === 'ocean' ? '59, 130, 246' : currentTheme.id === 'amethyst' ? '139, 92, 246' : currentTheme.id === 'sunset' ? '249, 115, 22' : '75, 85, 99'}, 0.05) !important;
+          background-color: rgba(${hexToRgb(currentTheme.primary)}, 0.05) !important;
         }
 
         /* Buttons glow shadow override */
@@ -1773,59 +2300,85 @@ export default function App() {
         }
       `}</style>
 
-      <div id="root-app-layout" className="min-h-screen bg-[#fff0f5] flex font-sans text-gray-800 print:hidden">
-      {/* Sidebar with wider, prominent logo */}
-      <div className={`${isSidebarCollapsed ? 'w-20' : 'w-72'} bg-[#ff6699] sidebar-theme-bg text-white flex flex-col p-5 shadow-lg shrink-0 transition-all duration-300 relative`}>
-        {/* Collapse Toggle Button */}
-        <button 
-          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
-          className="absolute top-4 -right-3.5 bg-[#ff3377] toggle-btn-theme text-white p-1 rounded-full border border-white hover:bg-[#ff1a5c] shadow transition-transform duration-200 z-50 flex items-center justify-center cursor-pointer"
-          title={isSidebarCollapsed ? "Expand Navigation" : "Collapse Navigation"}
-        >
-          {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-        </button>
-
-        <div className="flex flex-col items-center justify-center mb-4 text-center">
-          {isSidebarCollapsed ? (
-            <img src={settings.logoUrl} alt="Logo" className="w-10 h-10 object-cover rounded-full shadow-md border border-white mb-1" referrerPolicy="no-referrer" />
-          ) : (
-            <>
-              <img src={settings.logoUrl} alt="Logo" className="w-full h-28 object-cover rounded-xl shadow-md border-2 border-white mb-2" referrerPolicy="no-referrer" />
-              <h3 className="text-xl font-bold tracking-tight">{settings.namaToko}</h3>
-            </>
-          )}
-        </div>
-
-        {!isSidebarCollapsed ? (
-          <div className="text-center mb-5 text-xs bg-white/10 p-3 rounded-xl backdrop-blur-sm space-y-1">
-            <b className="text-sm font-semibold">{user.nama}</b> ({user.role})<br/>
-            <span className="inline-block px-2.5 py-0.5 bg-white text-gray-900 rounded font-bold text-xs">{user.cabang}</span>
-            <div className="text-white/90 text-[11px] flex items-center justify-center gap-1 pt-1">
-              <Clock className="w-3 h-3"/> Masuk: {user.loginTime} | Shift: {user.shift}
-            </div>
-          </div>
-        ) : (
-          <div className="text-center mb-3 bg-white/10 py-1.5 px-1 rounded-lg text-[10px] truncate font-bold" title={`${user.nama} (${user.role})`}>
-            {user.role.substring(0, 5)}..
-          </div>
+      <div id="root-app-layout" className="min-h-screen bg-[#fff0f5] flex flex-col md:flex-row font-sans text-gray-800 print:hidden overflow-hidden">
+        {/* Backdrop overlay for mobile when sidebar is open */}
+        {isMobile && !isSidebarCollapsed && (
+          <div 
+            onClick={() => setIsSidebarCollapsed(true)}
+            className="fixed inset-0 bg-black/50 z-30 transition-opacity duration-300"
+          />
         )}
+
+        {/* Sidebar with wider, prominent logo */}
+        <div className={`
+          ${isMobile 
+            ? `fixed inset-y-0 left-0 z-40 transition-transform duration-300 transform ${isSidebarCollapsed ? '-translate-x-full w-0 p-0 overflow-hidden' : 'translate-x-0 w-72 p-5'}` 
+            : `${isSidebarCollapsed ? 'w-20' : 'w-72'} p-5 relative`
+          } 
+          bg-[#ff6699] sidebar-theme-bg text-white flex flex-col shadow-lg shrink-0 transition-all duration-300
+        `}>
+          {/* Collapse Toggle Button */}
+          {!isMobile && (
+            <button 
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
+              className="absolute top-4 -right-3.5 bg-[#ff3377] toggle-btn-theme text-white p-1 rounded-full border border-white hover:bg-[#ff1a5c] shadow transition-transform duration-200 z-50 flex items-center justify-center cursor-pointer"
+              title={isSidebarCollapsed ? "Expand Navigation" : "Collapse Navigation"}
+            >
+              {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+            </button>
+          )}
+
+          <div className="flex flex-col items-center justify-center mb-4 text-center relative">
+            {isMobile && (
+              <button 
+                onClick={() => setIsSidebarCollapsed(true)} 
+                className="absolute top-0 right-0 p-1.5 bg-white/10 hover:bg-white/20 rounded-full text-white cursor-pointer z-50"
+                title="Tutup Menu"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+
+            {isSidebarCollapsed && !isMobile ? (
+              <img src={settings.logoUrl} alt="Logo" className="w-10 h-10 object-cover rounded-full shadow-md border border-white mb-1" referrerPolicy="no-referrer" />
+            ) : (
+              <>
+                <img src={settings.logoUrl} alt="Logo" className="w-full h-28 object-cover rounded-xl shadow-md border-2 border-white mb-2" referrerPolicy="no-referrer" />
+                <h3 className="text-xl font-bold tracking-tight">{settings.namaToko}</h3>
+              </>
+            )}
+          </div>
+
+          {(!isSidebarCollapsed || isMobile) ? (
+            <div className="text-center mb-5 text-xs bg-white/10 p-3 rounded-xl backdrop-blur-sm space-y-1">
+              <b className="text-sm font-semibold">{user.nama}</b> ({user.role})<br/>
+              <span className="inline-block px-2.5 py-0.5 bg-white text-gray-900 rounded font-bold text-xs">{user.cabang}</span>
+              <div className="text-white/90 text-[11px] flex items-center justify-center gap-1 pt-1">
+                <Clock className="w-3 h-3"/> Masuk: {user.loginTime} | Shift: {user.shift}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center mb-3 bg-white/10 py-1.5 px-1 rounded-lg text-[10px] truncate font-bold" title={`${user.nama} (${user.role})`}>
+              {user.role.substring(0, 5)}..
+            </div>
+          )}
 
         <hr className="border-white/20 mb-4" />
 
         <nav className="space-y-1.5 flex-1 text-sm overflow-y-auto no-scrollbar">
           <button 
-            onClick={() => setActiveTab('pos')}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-colors ${activeTab === 'pos' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+            onClick={() => handleNavSelect('pos')}
+            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-all ${activeTab === 'pos' ? 'nav-btn-active' : 'nav-btn-inactive'}`}
             title="Kasir POS"
           >
-            <ShoppingCart className="w-4 h-4 shrink-0" />
+            <ShoppingCart className="w-4 h-4 shrink-0 animate-pulse-slow" />
             {!isSidebarCollapsed && <span>Kasir POS</span>}
           </button>
           
           {(user.role === 'Owner' || user.role === 'Admin Cabang') && (
             <button 
-              onClick={() => setActiveTab('barang')}
-              className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-colors ${activeTab === 'barang' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+              onClick={() => handleNavSelect('barang')}
+              className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-all ${activeTab === 'barang' ? 'nav-btn-active' : 'nav-btn-inactive'}`}
               title="Kelola Barang"
             >
               <Package className="w-4 h-4 shrink-0" />
@@ -1835,8 +2388,8 @@ export default function App() {
 
           {(user.role === 'Owner' || user.role === 'Admin Cabang') && (
             <button 
-              onClick={() => setActiveTab('opname')}
-              className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-colors ${activeTab === 'opname' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+              onClick={() => handleNavSelect('opname')}
+              className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-all ${activeTab === 'opname' ? 'nav-btn-active' : 'nav-btn-inactive'}`}
               title="Stok Opname"
             >
               <Scale className="w-4 h-4 shrink-0" />
@@ -1845,8 +2398,8 @@ export default function App() {
           )}
 
           <button 
-            onClick={() => setActiveTab('laporan')}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-colors ${activeTab === 'laporan' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+            onClick={() => handleNavSelect('laporan')}
+            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-all ${activeTab === 'laporan' ? 'nav-btn-active' : 'nav-btn-inactive'}`}
             title="Lap. Keuangan Analitik"
           >
             <BarChart3 className="w-4 h-4 shrink-0" />
@@ -1855,8 +2408,8 @@ export default function App() {
 
           {(user.role === 'Owner' || user.role === 'Admin Cabang') && (
             <button 
-              onClick={() => setActiveTab('audit')}
-              className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-colors ${activeTab === 'audit' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+              onClick={() => handleNavSelect('audit')}
+              className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-all ${activeTab === 'audit' ? 'nav-btn-active' : 'nav-btn-inactive'}`}
               title="Audit Stok Opname"
             >
               <ShieldCheck className="w-4 h-4 shrink-0" />
@@ -1865,8 +2418,8 @@ export default function App() {
           )}
 
           <button 
-            onClick={() => setActiveTab('transfer')}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-colors ${activeTab === 'transfer' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+            onClick={() => handleNavSelect('transfer')}
+            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-all ${activeTab === 'transfer' ? 'nav-btn-active' : 'nav-btn-inactive'}`}
             title="Transfer Antar Cabang"
           >
             <ArrowRightLeft className="w-4 h-4 shrink-0" />
@@ -1882,40 +2435,40 @@ export default function App() {
           )}
 
           <button 
-            onClick={() => setActiveTab('erp')}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'gap-3 px-4 py-2'} rounded-lg font-medium transition-colors ${activeTab === 'erp' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+            onClick={() => handleNavSelect('erp')}
+            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'gap-3 px-4 py-2'} rounded-lg font-medium transition-all ${activeTab === 'erp' ? 'nav-btn-active' : 'nav-btn-inactive'}`}
             title="ERP Executive Cockpit"
           >
             <Boxes className="w-4 h-4 shrink-0" />
             {!isSidebarCollapsed && <span>ERP Executive Cockpit</span>}
           </button>
           <button 
-            onClick={() => setActiveTab('ledger')}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'gap-3 px-4 py-2'} rounded-lg font-medium transition-colors ${activeTab === 'ledger' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+            onClick={() => handleNavSelect('ledger')}
+            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'gap-3 px-4 py-2'} rounded-lg font-medium transition-all ${activeTab === 'ledger' ? 'nav-btn-active' : 'nav-btn-inactive'}`}
             title="Buku Besar Akuntansi"
           >
             <BookOpen className="w-4 h-4 shrink-0" />
             {!isSidebarCollapsed && <span>Buku Besar Akuntansi</span>}
           </button>
           <button 
-            onClick={() => setActiveTab('po')}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'gap-3 px-4 py-2'} rounded-lg font-medium transition-colors ${activeTab === 'po' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+            onClick={() => handleNavSelect('po')}
+            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'gap-3 px-4 py-2'} rounded-lg font-medium transition-all ${activeTab === 'po' ? 'nav-btn-active' : 'nav-btn-inactive'}`}
             title="Rantai Pasok & PO"
           >
             <Truck className="w-4 h-4 shrink-0" />
             {!isSidebarCollapsed && <span>Rantai Pasok & PO</span>}
           </button>
           <button 
-            onClick={() => setActiveTab('payroll')}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'gap-3 px-4 py-2'} rounded-lg font-medium transition-colors ${activeTab === 'payroll' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+            onClick={() => handleNavSelect('payroll')}
+            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'gap-3 px-4 py-2'} rounded-lg font-medium transition-all ${activeTab === 'payroll' ? 'nav-btn-active' : 'nav-btn-inactive'}`}
             title="SDM & Payroll Komisi"
           >
             <Wallet className="w-4 h-4 shrink-0" />
             {!isSidebarCollapsed && <span>SDM & Payroll Komisi</span>}
           </button>
           <button 
-            onClick={() => setActiveTab('production')}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'gap-3 px-4 py-2'} rounded-lg font-medium transition-colors ${activeTab === 'production' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+            onClick={() => handleNavSelect('production')}
+            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'gap-3 px-4 py-2'} rounded-lg font-medium transition-all ${activeTab === 'production' ? 'nav-btn-active' : 'nav-btn-inactive'}`}
             title="Manufaktur & BOM"
           >
             <Factory className="w-4 h-4 shrink-0" />
@@ -1932,24 +2485,24 @@ export default function App() {
                 </div>
               )}
               <button 
-                onClick={() => setActiveTab('cabang')}
-                className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-colors ${activeTab === 'cabang' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+                onClick={() => handleNavSelect('cabang')}
+                className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-all ${activeTab === 'cabang' ? 'nav-btn-active' : 'nav-btn-inactive'}`}
                 title="Kelola Cabang"
               >
                 <Building2 className="w-4 h-4 shrink-0" />
                 {!isSidebarCollapsed && <span>Kelola Cabang</span>}
               </button>
               <button 
-                onClick={() => setActiveTab('staff')}
-                className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-colors ${activeTab === 'staff' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+                onClick={() => handleNavSelect('staff')}
+                className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-all ${activeTab === 'staff' ? 'nav-btn-active' : 'nav-btn-inactive'}`}
                 title="Kelola Staff & Akses"
               >
                 <Users className="w-4 h-4 shrink-0" />
                 {!isSidebarCollapsed && <span>Kelola Staff & Akses</span>}
               </button>
               <button 
-                onClick={() => setActiveTab('settings')}
-                className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-colors ${activeTab === 'settings' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+                onClick={() => handleNavSelect('settings')}
+                className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-all ${activeTab === 'settings' ? 'nav-btn-active' : 'nav-btn-inactive'}`}
                 title="Pengaturan Toko & Bank"
               >
                 <Settings className="w-4 h-4 shrink-0" />
@@ -1959,8 +2512,8 @@ export default function App() {
           )}
 
           <button 
-            onClick={() => setActiveTab('panduan')}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-colors ${activeTab === 'panduan' ? 'nav-btn-active bg-[#ff3377] text-white shadow' : 'nav-btn-inactive text-white/90 hover:bg-[#ff3377]/60'}`}
+            onClick={() => handleNavSelect('panduan')}
+            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'} rounded-lg font-medium transition-all ${activeTab === 'panduan' ? 'nav-btn-active' : 'nav-btn-inactive'}`}
             title="Panduan & Cara Pakai"
           >
             <HelpCircle className="w-4 h-4 shrink-0" />
@@ -1969,7 +2522,10 @@ export default function App() {
         </nav>
 
         <button 
-          onClick={() => setUser(null)}
+          onClick={() => {
+            setUser(null);
+            localStorage.removeItem('pinky_user');
+          }}
           className={`mt-auto w-full bg-red-500 hover:bg-red-600 text-white font-medium ${isSidebarCollapsed ? 'p-2.5 justify-center' : 'py-2.5 justify-center'} rounded-lg flex items-center gap-2 text-sm shadow transition-colors`}
           title="Keluar / Log Out"
         >
@@ -1979,7 +2535,30 @@ export default function App() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 p-8 overflow-y-auto max-h-screen">
+      <div className="flex-1 flex flex-col min-w-0 max-h-screen overflow-hidden">
+        {/* Mobile Sticky Header */}
+        {isMobile && (
+          <header className="bg-[#ff6699] sidebar-theme-bg text-white px-4 py-3 flex items-center justify-between shadow-md shrink-0 sticky top-0 z-20">
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setIsSidebarCollapsed(false)}
+                className="p-1.5 bg-white/10 hover:bg-white/20 rounded-lg transition-colors cursor-pointer flex items-center justify-center"
+                title="Buka Menu"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              {settings.logoUrl && (
+                <img src={settings.logoUrl} alt="Logo" className="w-8 h-8 object-cover rounded-full border border-white/20 shadow-xs" referrerPolicy="no-referrer" />
+              )}
+              <span className="font-bold text-sm truncate max-w-[150px]">{settings.namaToko}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="bg-white/15 px-2.5 py-1 rounded font-bold text-xs tracking-wide">{user.cabang}</span>
+            </div>
+          </header>
+        )}
+
+        <div className="flex-1 p-4 md:p-8 overflow-y-auto max-h-full">
         
         {/* TAB POS */}
         {activeTab === 'pos' && (
@@ -2452,6 +3031,106 @@ export default function App() {
                 </button>
               </div>
             </div>
+
+            {/* SEKSI LAPORAN PENJUALAN INTEGRASI */}
+            <div className="mt-8 border-t border-pink-100 pt-6">
+              <h4 className="text-[#ff3377] font-bold text-lg mb-2 flex items-center gap-2" style={{ color: currentTheme.primary }}>
+                <BarChart3 className="w-5 h-5" /> Laporan Penjualan Konsolidasi Multi-Cabang
+              </h4>
+              <p className="text-xs text-gray-500 mb-4">Laporan rekapitulasi penjualan real-time dari seluruh cabang untuk mencocokkan arus keluar barang dengan audit fisik stok opname.</p>
+
+              <div className="overflow-x-auto rounded-xl border border-gray-100">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-pink-50 text-gray-700 text-xs uppercase font-semibold">
+                    <tr>
+                      <th className="p-3">Waktu</th>
+                      <th className="p-3">No. Nota</th>
+                      <th className="p-3">Cabang</th>
+                      <th className="p-3">Kasir</th>
+                      <th className="p-3">Produk Terjual</th>
+                      <th className="p-3 text-right">Total (Rp)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 text-xs">
+                    {transaksiList.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="text-center py-8 text-gray-400 font-medium">Belum ada data transaksi penjualan tercatat.</td>
+                      </tr>
+                    ) : (
+                      transaksiList.map((t, idx) => (
+                        <tr key={idx} className="hover:bg-pink-50/10">
+                          <td className="p-3 text-gray-500 whitespace-nowrap">{new Date(t[0]).toLocaleString('id-ID')}</td>
+                          <td className="p-3 font-mono font-bold text-[#ff3377]" style={{ color: currentTheme.primary }}>{t[1]}</td>
+                          <td className="p-3">
+                            <span className="px-2 py-0.5 bg-pink-50 text-[#ff3377] text-xs rounded font-medium" style={{ color: currentTheme.primary, backgroundColor: currentTheme.lightTint + '33' }}>
+                              {t[4]}
+                            </span>
+                          </td>
+                          <td className="p-3 text-gray-600">{t[3]}</td>
+                          <td className="p-3">
+                            <div className="space-y-1">
+                              {Array.isArray(t[7]) ? t[7].map((item: any, i: number) => (
+                                <div key={i} className="text-[11px] text-gray-700 font-medium">
+                                  🌸 {item.nama} <span className="text-pink-600 font-bold" style={{ color: currentTheme.primary }}>x{item.qty}</span>
+                                </div>
+                              )) : <span className="text-gray-400">-</span>}
+                            </div>
+                          </td>
+                          <td className="p-3 text-right font-bold text-gray-900">
+                            Rp {Number(t[5] || 0).toLocaleString('id-ID')}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                  {/* BARIS PALING BAWAH: INFO JUMLAH UNTUK MASING-MASING CABANG */}
+                  <tfoot className="bg-pink-50/80 border-t-2 border-pink-200 text-xs text-gray-800">
+                    <tr>
+                      <td colSpan={4} className="p-4 align-top font-bold text-gray-600 border-r border-pink-100">
+                        <div className="space-y-1">
+                          <span className="text-xs uppercase tracking-wider text-[#ff3377] font-black block mb-2" style={{ color: currentTheme.primary }}>
+                            📊 Rekapitulasi Omset Penjualan Per Cabang:
+                          </span>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            {cabangList.map((cab, cidx) => {
+                              const branchName = cab[1];
+                              const branchSales = transaksiList
+                                .filter(t => t[4] === branchName)
+                                .reduce((sum, t) => sum + Number(t[5] || 0), 0);
+                              const branchQty = transaksiList
+                                .filter(t => t[4] === branchName)
+                                .reduce((sum, t) => {
+                                  if (Array.isArray(t[7])) {
+                                    return sum + t[7].reduce((sItem: number, item: any) => sItem + Number(item.qty || 0), 0);
+                                  }
+                                  return sum;
+                                }, 0);
+                              return (
+                                <div key={cidx} className="bg-white p-2.5 rounded-lg border border-pink-100 shadow-2xs">
+                                  <div className="font-extrabold text-gray-800 text-[11px] truncate">{branchName}</div>
+                                  <div className="text-xs font-black text-[#ff3377] mt-0.5" style={{ color: currentTheme.primary }}>
+                                    Rp {branchSales.toLocaleString('id-ID')}
+                                  </div>
+                                  <div className="text-[10px] text-gray-500 font-semibold mt-0.5">
+                                    Terjual: {branchQty.toLocaleString('id-ID')} pcs
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4 text-right font-extrabold text-gray-600 align-middle">
+                        TOTAL KONSOLIDASI:
+                      </td>
+                      <td className="p-4 text-right font-black text-[#ff3377] text-sm align-middle bg-pink-100/40 whitespace-nowrap" style={{ color: currentTheme.primary }}>
+                        Rp {transaksiList.reduce((sum, t) => sum + Number(t[5] || 0), 0).toLocaleString('id-ID')}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
           </div>
         )}
 
@@ -2499,8 +3178,10 @@ export default function App() {
               </div>
             </div>
 
-            {/* HPP & Biaya Operasional (Overheads) Configuration Card */}
-            <div className="bg-pink-50/60 p-5 rounded-2xl border border-pink-200 mb-6 space-y-4">
+            {/* Seksi 1: Analisis Laba Rugi & Grafik Tren */}
+              <>
+                {/* HPP & Biaya Operasional (Overheads) Configuration Card */}
+                <div className="bg-pink-50/60 p-5 rounded-2xl border border-pink-200 mb-6 space-y-4">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <h5 className="font-bold text-gray-800 text-sm flex items-center gap-2">
                   <span>🏢</span> HPP & Biaya Operasional Usaha (Tarif Berbeda Per Cabang)
@@ -2715,8 +3396,356 @@ export default function App() {
                 </tbody>
               </table>
             </div>
+          </>
+
+          <div className="my-10 border-t border-pink-100 pt-8" />
+
+          {/* Seksi 2: Laporan Penjualan Konsolidasi Multi-Cabang */}
+          <div className="space-y-6">
+            <div className="bg-pink-50/30 p-5 rounded-2xl border border-pink-100">
+              <h4 className="text-[#ff3377] font-bold text-lg mb-2 flex items-center gap-2" style={{ color: currentTheme.primary }}>
+                <BarChart3 className="w-5 h-5" /> Laporan Penjualan Konsolidasi Multi-Cabang
+              </h4>
+              <p className="text-xs text-gray-500 mb-4">Laporan rekapitulasi penjualan real-time dari seluruh cabang (Sesuai Filter Pencarian).</p>
+
+              <div className="overflow-x-auto rounded-xl border border-gray-100 bg-white">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-pink-50 text-gray-700 text-xs uppercase font-semibold">
+                    <tr>
+                      <th className="p-3">Waktu</th>
+                      <th className="p-3">No. Nota</th>
+                      <th className="p-3">Cabang</th>
+                      <th className="p-3">Kasir</th>
+                      <th className="p-3">Produk Terjual</th>
+                      <th className="p-3 text-right">Total (Rp)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 text-xs">
+                    {filteredTransaksi.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="text-center py-8 text-gray-400 font-medium">Belum ada data transaksi penjualan tercatat untuk filter ini.</td>
+                      </tr>
+                    ) : (
+                      filteredTransaksi.map((t, idx) => (
+                        <tr key={idx} className="hover:bg-pink-50/10">
+                          <td className="p-3 text-gray-500 whitespace-nowrap">{new Date(t[0]).toLocaleString('id-ID')}</td>
+                          <td className="p-3 font-mono font-bold text-[#ff3377]" style={{ color: currentTheme.primary }}>{t[1]}</td>
+                          <td className="p-3">
+                            <span className="px-2 py-0.5 bg-pink-50 text-[#ff3377] text-xs rounded font-medium" style={{ color: currentTheme.primary, backgroundColor: currentTheme.lightTint + '33' }}>
+                              {t[4]}
+                            </span>
+                          </td>
+                          <td className="p-3 text-gray-600">{t[3]}</td>
+                          <td className="p-3">
+                            <div className="space-y-1">
+                              {Array.isArray(t[7]) ? t[7].map((item: any, i: number) => (
+                                <div key={i} className="text-[11px] text-gray-700 font-medium">
+                                  🌸 {item.nama} <span className="text-pink-600 font-bold" style={{ color: currentTheme.primary }}>x{item.qty}</span>
+                                </div>
+                              )) : <span className="text-gray-400">-</span>}
+                            </div>
+                          </td>
+                          <td className="p-3 text-right font-bold text-gray-900">
+                            Rp {Number(t[5] || 0).toLocaleString('id-ID')}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                  {/* BARIS PALING BAWAH: INFO JUMLAH UNTUK MASING-MASING CABANG */}
+                  <tfoot className="bg-pink-50/80 border-t-2 border-pink-200 text-xs text-gray-800">
+                    <tr>
+                      <td colSpan={4} className="p-4 align-top font-bold text-gray-600 border-r border-pink-100">
+                        <div className="space-y-1">
+                          <span className="text-xs uppercase tracking-wider text-[#ff3377] font-black block mb-2" style={{ color: currentTheme.primary }}>
+                            📊 Rekapitulasi Omset Penjualan Per Cabang (Sesuai Filter):
+                          </span>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            {cabangList
+                              .filter(cab => actualBranchFilter === 'ALL' || cab[1] === actualBranchFilter)
+                              .map((cab, cidx) => {
+                                const branchName = cab[1];
+                                const branchSales = filteredTransaksi
+                                  .filter(t => t[4] === branchName)
+                                  .reduce((sum, t) => sum + Number(t[5] || 0), 0);
+                                const branchQty = filteredTransaksi
+                                  .filter(t => t[4] === branchName)
+                                  .reduce((sum, t) => {
+                                    if (Array.isArray(t[7])) {
+                                      return sum + t[7].reduce((sItem: number, item: any) => sItem + Number(item.qty || 0), 0);
+                                    }
+                                    return sum;
+                                  }, 0);
+                                return (
+                                  <div key={cidx} className="bg-white p-2.5 rounded-lg border border-pink-100 shadow-2xs">
+                                    <div className="font-extrabold text-gray-800 text-[11px] truncate">{branchName}</div>
+                                    <div className="text-xs font-black text-[#ff3377] mt-0.5" style={{ color: currentTheme.primary }}>
+                                      Rp {branchSales.toLocaleString('id-ID')}
+                                    </div>
+                                    <div className="text-[10px] text-gray-500 font-semibold mt-0.5">
+                                      Terjual: {branchQty.toLocaleString('id-ID')} pcs
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4 text-right font-extrabold text-gray-600 align-middle font-sans">
+                        TOTAL KONSOLIDASI:
+                      </td>
+                      <td className="p-4 text-right font-black text-[#ff3377] text-sm align-middle bg-pink-100/40 whitespace-nowrap" style={{ color: currentTheme.primary }}>
+                        Rp {filteredTransaksi.reduce((sum, t) => sum + Number(t[5] || 0), 0).toLocaleString('id-ID')}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
           </div>
-        )}
+
+          <div className="my-10 border-t border-pink-100 pt-8" />
+
+          {/* Seksi 3: Buku Kas Harian */}
+          <div className="space-y-6">
+              <h4 className="text-[#ff3377] font-bold text-lg mb-2 flex items-center gap-2" style={{ color: currentTheme.primary }}>
+                <Wallet className="w-5 h-5" /> Buku Kas Harian ({user?.role === 'Owner' ? reportBranchFilter === 'ALL' ? 'Semua Cabang Konsolidasi' : reportBranchFilter : user?.cabang})
+              </h4>
+              <p className="text-xs text-gray-500 mb-6">Pencatatan kas masuk (Debet) dan kas keluar (Kredit) harian secara real-time, otomatis digabungkan dengan transaksi penjualan POS, PO supplier, dan penggajian karyawan.</p>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                {/* Form Tambah Kas Manual */}
+                <div className="lg:col-span-1 bg-pink-50/30 p-4 rounded-xl border border-pink-100">
+                  <h5 className="font-bold text-gray-800 text-sm mb-3 flex items-center gap-2 text-[#ff3377]" style={{ color: currentTheme.primary }}>
+                    <Plus className="w-4 h-4" /> Catat Arus Kas Manual
+                  </h5>
+                  <form onSubmit={handleSimpanKasHarian} className="space-y-3">
+                    <div>
+                      <label className="text-xs font-semibold text-gray-600 block mb-1">Tanggal</label>
+                      <input 
+                        type="date" 
+                        value={newKasTanggal} 
+                        onChange={e => setNewKasTanggal(e.target.value)}
+                        className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs"
+                        required
+                      />
+                    </div>
+                    {user?.role === 'Owner' && (
+                      <div>
+                        <label className="text-xs font-semibold text-gray-600 block mb-1">Cabang</label>
+                        <select 
+                          value={newKasCabang} 
+                          onChange={e => setNewKasCabang(e.target.value)}
+                          className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium"
+                        >
+                          {cabangList.map((c, i) => (
+                            <option key={i} value={c[1]}>{c[1]}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <div>
+                      <label className="text-xs font-semibold text-gray-600 block mb-1">Tipe Aliran Kas</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setNewKasTipe('Debet')}
+                          className={`py-1 rounded-lg text-xs font-bold transition-all border ${
+                            newKasTipe === 'Debet' 
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-xs' 
+                              : 'bg-white text-blue-600 border-blue-200 hover:bg-blue-50/50'
+                          }`}
+                        >
+                          🟢 DEBET (Kas Masuk)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNewKasTipe('Kredit')}
+                          className={`py-1 rounded-lg text-xs font-bold transition-all border ${
+                            newKasTipe === 'Kredit' 
+                              ? 'bg-red-600 text-white border-red-600 shadow-xs' 
+                              : 'bg-white text-red-600 border-red-200 hover:bg-red-50/50'
+                          }`}
+                        >
+                          🔴 KREDIT (Kas Keluar)
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-600 block mb-1">Keterangan Transaksi</label>
+                      <input 
+                        type="text" 
+                        value={newKasKeterangan} 
+                        onChange={e => setNewKasKeterangan(e.target.value)}
+                        placeholder="Contoh: Tambah Modal Kas, Biaya Kirim, dll"
+                        className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-gray-600 block mb-1">Jumlah Uang (Rp)</label>
+                      <input 
+                        type="number" 
+                        value={newKasJumlah} 
+                        onChange={e => setNewKasJumlah(e.target.value)}
+                        placeholder="Masukkan nominal Rp"
+                        className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-800"
+                        min="1"
+                        required
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="w-full text-white text-xs font-bold py-2 rounded-lg shadow-sm transition-all flex items-center justify-center gap-1 hover:opacity-90 mt-2"
+                      style={{ backgroundColor: currentTheme.primary }}
+                    >
+                      <span>💾 Simpan Catatan Kas</span>
+                    </button>
+                  </form>
+                </div>
+
+                {/* Ringkasan Kas & Daftar Riwayat */}
+                <div className="lg:col-span-2 flex flex-col justify-between">
+                  {(() => {
+                    // Calculate totals from combinedKasEntries
+                    const list = (() => {
+                      const l: any[] = [];
+                      kasHarianList.forEach(k => {
+                        l.push({ id: k.id, tanggal: k.tanggal, keterangan: k.keterangan, tipe: k.tipe, jumlah: k.jumlah, cabang: k.cabang, isManual: true });
+                      });
+                      transaksiList.forEach(t => {
+                        l.push({ id: t[1], tanggal: t[0], keterangan: `Penjualan POS (Nota: ${t[1]}) [${t[6]}]`, tipe: 'Debet', jumlah: Number(t[5] || 0), cabang: t[4], isManual: false });
+                      });
+                      purchaseOrdersList.filter(po => po.status === 'Received').forEach(po => {
+                        l.push({ id: `PO-${po.id}`, tanggal: po.tanggal, keterangan: `Pembelian PO Ke Supplier ${po.supplier}`, tipe: 'Kredit', jumlah: Number(po.total || 0), cabang: po.cabang, isManual: false });
+                      });
+                      payrollList.filter(pay => pay.status === 'Paid').forEach(pay => {
+                        l.push({ id: pay.id, tanggal: pay.tanggal || (Date.now() - 86400000 * 2), keterangan: `Gaji Staff ${pay.pegawai} (${pay.periode})`, tipe: 'Kredit', jumlah: Number(pay.totalTerima || 0), cabang: pay.cabang, isManual: false });
+                      });
+
+                      const actualBranch = user?.role === 'Owner' ? reportBranchFilter : user?.cabang;
+                      let filtered = l;
+                      if (actualBranch !== 'ALL' && actualBranch !== 'Semua Cabang') {
+                        filtered = filtered.filter(item => item.cabang === actualBranch);
+                      }
+
+                      const now = Date.now();
+                      if (reportPeriodFilter === 'daily') {
+                        filtered = filtered.filter(item => (now - item.tanggal) <= 86400000);
+                      } else if (reportPeriodFilter === 'monthly') {
+                        filtered = filtered.filter(item => (now - item.tanggal) <= 86400000 * 30);
+                      } else if (reportPeriodFilter === 'yearly') {
+                        filtered = filtered.filter(item => (now - item.tanggal) <= 86400000 * 365);
+                      }
+
+                      filtered.sort((a, b) => a.tanggal - b.tanggal);
+                      let runningSaldo = 0;
+                      const computed = filtered.map(item => {
+                        if (item.tipe === 'Debet') {
+                          runningSaldo += item.jumlah;
+                        } else {
+                          runningSaldo -= item.jumlah;
+                        }
+                        return { ...item, saldo: runningSaldo };
+                      });
+                      return computed.reverse();
+                    })();
+
+                    const totalDebet = list.filter(item => item.tipe === 'Debet').reduce((sum, item) => sum + item.jumlah, 0);
+                    const totalKredit = list.filter(item => item.tipe === 'Kredit').reduce((sum, item) => sum + item.jumlah, 0);
+                    const finalSaldo = list.length > 0 ? list[0].saldo : 0;
+
+                    return (
+                      <div className="space-y-4 h-full flex flex-col justify-between">
+                        {/* Summary Widget Cards */}
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl text-center">
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-blue-600 block mb-0.5">🟢 Total Debet (In)</span>
+                            <span className="text-sm font-black text-blue-900">Rp {totalDebet.toLocaleString('id-ID')}</span>
+                          </div>
+                          <div className="bg-red-50 border border-red-100 p-3 rounded-xl text-center">
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-red-600 block mb-0.5">🔴 Total Kredit (Out)</span>
+                            <span className="text-sm font-black text-red-900">Rp {totalKredit.toLocaleString('id-ID')}</span>
+                          </div>
+                          <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-xl text-center">
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-600 block mb-0.5">💎 Saldo Buku Kas</span>
+                            <span className={`text-sm font-black ${finalSaldo >= 0 ? 'text-emerald-900' : 'text-red-700'}`}>
+                              Rp {finalSaldo.toLocaleString('id-ID')}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* List Table of Cash Book */}
+                        <div className="overflow-x-auto rounded-xl border border-gray-100 flex-1 max-h-[295px] overflow-y-auto">
+                          <table className="w-full text-sm text-left">
+                            <thead className="bg-gray-50 text-gray-600 text-[10px] uppercase font-bold tracking-wider sticky top-0">
+                              <tr>
+                                <th className="p-2.5">Waktu</th>
+                                <th className="p-2.5">Referensi</th>
+                                <th className="p-2.5">Keterangan</th>
+                                <th className="p-2.5 text-right">Debet (+)</th>
+                                <th className="p-2.5 text-right">Kredit (-)</th>
+                                <th className="p-2.5 text-right">Saldo Kas</th>
+                                <th className="p-2.5 text-center">Aksi</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 text-xs">
+                              {list.length === 0 ? (
+                                <tr>
+                                  <td colSpan={7} className="text-center py-10 text-gray-400">
+                                    Belum ada aliran kas masuk/keluar pada periode ini.
+                                  </td>
+                                </tr>
+                              ) : (
+                                list.map((item, idx) => (
+                                  <tr key={idx} className="hover:bg-gray-50/50">
+                                    <td className="p-2 text-gray-500 whitespace-nowrap">{new Date(item.tanggal).toLocaleDateString('id-ID')}</td>
+                                    <td className="p-2 font-mono text-[10px] font-bold text-[#ff3377]" style={{ color: currentTheme.primary }}>{item.id}</td>
+                                    <td className="p-2 font-medium text-gray-800">
+                                      <div className="max-w-[150px] truncate" title={item.keterangan}>
+                                        {item.keterangan}
+                                      </div>
+                                      <span className="text-[9px] text-pink-600 bg-pink-50 px-1 py-0.2 rounded" style={{ color: currentTheme.primary, backgroundColor: currentTheme.lightTint + '33' }}>
+                                        {item.cabang}
+                                      </span>
+                                    </td>
+                                    <td className="p-2 text-right font-bold text-blue-600 whitespace-nowrap">
+                                      {item.tipe === 'Debet' ? `Rp ${item.jumlah.toLocaleString('id-ID')}` : '-'}
+                                    </td>
+                                    <td className="p-2 text-right font-bold text-red-600 whitespace-nowrap">
+                                      {item.tipe === 'Kredit' ? `Rp ${item.jumlah.toLocaleString('id-ID')}` : '-'}
+                                    </td>
+                                    <td className="p-2 text-right font-extrabold text-gray-900 whitespace-nowrap">
+                                      Rp {item.saldo.toLocaleString('id-ID')}
+                                    </td>
+                                    <td className="p-2 text-center">
+                                      {item.isManual ? (
+                                        <button 
+                                          onClick={() => handleHapusKasHarianEntry(item.id)}
+                                          type="button"
+                                          className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50"
+                                          title="Hapus Catatan Manual"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      ) : (
+                                        <span className="text-[9px] text-gray-400 bg-gray-100 px-1 py-0.5 rounded uppercase font-bold">Auto</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+        </div>
+      )}
 
         {/* TAB AUDIT STOK OPNAME */}
         {activeTab === 'audit' && (user.role === 'Owner' || user.role === 'Admin Cabang') && (
@@ -3121,8 +4150,13 @@ export default function App() {
                   <span className="text-[10px] text-gray-400">Jika dikosongkan, dokumen PO akan otomatis menggunakan Alamat Utama di atas.</span>
                 </div>
                 <div className="md:col-span-2">
+                  <label className="text-xs font-semibold text-gray-600 block mb-1">Tagline Bisnis / Koperasi / Usaha</label>
+                  <input type="text" value={setTagline} onChange={e => setSetTagline(e.target.value)} placeholder="Contoh: Koperasi Serba Usaha, Fashion & Supply Chain, dll." className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm" />
+                  <span className="text-[10px] text-gray-400">Tagline ini akan dicantumkan di dokumen resmi seperti cetak PO (Purchase Order).</span>
+                </div>
+                <div className="md:col-span-2">
                   <label className="text-xs font-bold text-gray-700 block mb-2">Corporate Color Theme (Warna Aplikasi & Navigator)</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-2">
                     {THEMES.map((th) => (
                       <button
                         key={th.id}
@@ -3149,7 +4183,221 @@ export default function App() {
                         </span>
                       </button>
                     ))}
+                    <button
+                      type="button"
+                      onClick={() => setSetTheme(`custom_${customPrimary}_${customSecondary}`)}
+                      className={`p-2.5 rounded-xl border text-left transition-all ${
+                        setTheme.startsWith('custom_')
+                          ? 'border-gray-800 bg-gray-50 ring-2 ring-gray-400'
+                          : 'border-gray-200 bg-white hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span
+                          className="w-3.5 h-3.5 rounded-full inline-block border border-black/10 shadow-xs"
+                          style={{ backgroundColor: customPrimary }}
+                        />
+                        <span
+                          className="w-3.5 h-3.5 rounded-full inline-block border border-black/10 shadow-xs -ml-2"
+                          style={{ backgroundColor: customSecondary }}
+                        />
+                      </div>
+                      <span className="text-[11px] font-bold block text-gray-800 leading-tight text-[#ff3377]">
+                        🎨 More Colors...
+                      </span>
+                    </button>
                   </div>
+
+                  {/* Microsoft Office Standar More Colors Panel */}
+                  {setTheme.startsWith('custom_') && (
+                    <div className="mt-4 p-4 bg-white rounded-xl border border-gray-200 shadow-xs space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-gray-100 pb-2 gap-2">
+                        <h5 className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                          🎨 Kustomisasi Warna (Standar MS Office)
+                        </h5>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setCustomSecondary(customPrimary)}
+                            className="text-[10px] text-white hover:bg-gray-800 bg-gray-700 font-bold px-2.5 py-1 rounded-md transition-colors"
+                          >
+                            Samakan ke Navigator
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCustomPrimary(customSecondary)}
+                            className="text-[10px] text-white hover:bg-gray-800 bg-gray-700 font-bold px-2.5 py-1 rounded-md transition-colors"
+                          >
+                            Samakan ke Utama
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* WARNA UTAMA */}
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-gray-800">1. Warna Utama (Tombol & Highlight)</span>
+                            <span className="text-xs font-mono font-bold bg-gray-100 px-2 py-0.5 rounded text-gray-600 uppercase border border-gray-200 shadow-3xs">
+                              {customPrimary}
+                            </span>
+                          </div>
+
+                          {/* MS Office Theme Colors Grid */}
+                          <div>
+                            <span className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold block mb-1">Theme Colors (MS Office)</span>
+                            <div className="grid grid-cols-10 gap-1 bg-gray-50 p-2 rounded-lg border border-gray-200">
+                              {MS_OFFICE_THEME_COLORS.map((row, rIdx) => 
+                                row.map((color, cIdx) => (
+                                  <button
+                                    key={`pri-${rIdx}-${cIdx}`}
+                                    type="button"
+                                    onClick={() => setCustomPrimary(color)}
+                                    className={`w-full aspect-square rounded-xs border transition-all ${
+                                      customPrimary.toLowerCase() === color.toLowerCase() 
+                                        ? 'ring-2 ring-gray-800 border-white scale-110 z-10 shadow-xs' 
+                                        : 'border-gray-200 hover:scale-125 hover:z-20'
+                                    }`}
+                                    style={{ backgroundColor: color }}
+                                    title={color}
+                                  />
+                                ))
+                              )}
+                            </div>
+                          </div>
+
+                          {/* MS Office Standard Colors Row */}
+                          <div>
+                            <span className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold block mb-1">Standard Colors</span>
+                            <div className="flex gap-1 bg-gray-50 p-2 rounded-lg border border-gray-200 justify-between">
+                              {MS_OFFICE_STANDARD_ROW.map((color, idx) => (
+                                <button
+                                  key={`pri-std-${idx}`}
+                                  type="button"
+                                  onClick={() => setCustomPrimary(color)}
+                                  className={`w-full aspect-square rounded-xs border transition-all ${
+                                    customPrimary.toLowerCase() === color.toLowerCase() 
+                                      ? 'ring-2 ring-gray-800 border-white scale-110 z-10 shadow-xs' 
+                                      : 'border-gray-200 hover:scale-125'
+                                  }`}
+                                  style={{ backgroundColor: color }}
+                                  title={color}
+                                />
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Manual Input / Custom Tab */}
+                          <div className="flex items-center gap-3 bg-gray-50 p-2 rounded-lg border border-gray-200">
+                            <input
+                              type="color"
+                              value={customPrimary}
+                              onChange={(e) => setCustomPrimary(e.target.value)}
+                              className="w-10 h-10 p-0.5 border border-gray-300 rounded-lg cursor-pointer bg-white"
+                            />
+                            <div className="flex-1">
+                              <span className="text-[10px] text-gray-400 block uppercase font-bold leading-none mb-1">Warna Bebas / Custom</span>
+                              <input
+                                type="text"
+                                value={customPrimary}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val.startsWith('#') && val.length <= 7) {
+                                    setCustomPrimary(val);
+                                  } else if (!val.startsWith('#') && val.length <= 6) {
+                                    setCustomPrimary('#' + val);
+                                  }
+                                }}
+                                className="w-full px-2.5 py-1 text-sm bg-white border border-gray-300 rounded-md font-mono uppercase focus:outline-none focus:ring-1 focus:ring-gray-400"
+                                placeholder="#HEXCODE"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* WARNA NAVIGATOR */}
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-gray-800">2. Warna Navigator (Sidebar & Mobile Header)</span>
+                            <span className="text-xs font-mono font-bold bg-gray-100 px-2 py-0.5 rounded text-gray-600 uppercase border border-gray-200 shadow-3xs">
+                              {customSecondary}
+                            </span>
+                          </div>
+
+                          {/* MS Office Theme Colors Grid */}
+                          <div>
+                            <span className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold block mb-1">Theme Colors (MS Office)</span>
+                            <div className="grid grid-cols-10 gap-1 bg-gray-50 p-2 rounded-lg border border-gray-200">
+                              {MS_OFFICE_THEME_COLORS.map((row, rIdx) => 
+                                row.map((color, cIdx) => (
+                                  <button
+                                    key={`sec-${rIdx}-${cIdx}`}
+                                    type="button"
+                                    onClick={() => setCustomSecondary(color)}
+                                    className={`w-full aspect-square rounded-xs border transition-all ${
+                                      customSecondary.toLowerCase() === color.toLowerCase() 
+                                        ? 'ring-2 ring-gray-800 border-white scale-110 z-10 shadow-xs' 
+                                        : 'border-gray-200 hover:scale-125 hover:z-20'
+                                    }`}
+                                    style={{ backgroundColor: color }}
+                                    title={color}
+                                  />
+                                ))
+                              )}
+                            </div>
+                          </div>
+
+                          {/* MS Office Standard Colors Row */}
+                          <div>
+                            <span className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold block mb-1">Standard Colors</span>
+                            <div className="flex gap-1 bg-gray-50 p-2 rounded-lg border border-gray-200 justify-between">
+                              {MS_OFFICE_STANDARD_ROW.map((color, idx) => (
+                                <button
+                                  key={`sec-std-${idx}`}
+                                  type="button"
+                                  onClick={() => setCustomSecondary(color)}
+                                  className={`w-full aspect-square rounded-xs border transition-all ${
+                                    customSecondary.toLowerCase() === color.toLowerCase() 
+                                      ? 'ring-2 ring-gray-800 border-white scale-110 z-10 shadow-xs' 
+                                      : 'border-gray-200 hover:scale-125'
+                                  }`}
+                                  style={{ backgroundColor: color }}
+                                  title={color}
+                                />
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Manual Input / Custom Tab */}
+                          <div className="flex items-center gap-3 bg-gray-50 p-2 rounded-lg border border-gray-200">
+                            <input
+                              type="color"
+                              value={customSecondary}
+                              onChange={(e) => setCustomSecondary(e.target.value)}
+                              className="w-10 h-10 p-0.5 border border-gray-300 rounded-lg cursor-pointer bg-white"
+                            />
+                            <div className="flex-1">
+                              <span className="text-[10px] text-gray-400 block uppercase font-bold leading-none mb-1">Warna Bebas / Custom</span>
+                              <input
+                                type="text"
+                                value={customSecondary}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val.startsWith('#') && val.length <= 7) {
+                                    setCustomSecondary(val);
+                                  } else if (!val.startsWith('#') && val.length <= 6) {
+                                    setCustomSecondary('#' + val);
+                                  }
+                                }}
+                                className="w-full px-2.5 py-1 text-sm bg-white border border-gray-300 rounded-md font-mono uppercase focus:outline-none focus:ring-1 focus:ring-gray-400"
+                                placeholder="#HEXCODE"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="md:col-span-2">
                   <label className="text-xs font-semibold text-gray-600 block mb-1">URL Logo Toko (Perbesar Tampilan)</label>
@@ -3197,6 +4445,334 @@ export default function App() {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* INTEGRASI GOOGLE SHEETS */}
+              <div className="bg-pink-50/20 p-5 rounded-2xl border border-pink-100/80 space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-lg">
+                    田
+                  </div>
+                  <div>
+                    <h5 className="font-bold text-gray-800 text-sm">Integrasi Google Sheets & Sinkronisasi Otomatis</h5>
+                    <p className="text-[11px] text-gray-500">Kirim data transaksi langsung ke Google Spreadsheet Anda secara real-time.</p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-gray-100">
+                    <div>
+                      <span className="text-xs font-bold text-gray-700 block">Aktifkan Sinkronisasi Google Sheets</span>
+                      <span className="text-[10px] text-gray-400">Jika aktif, setiap checkout berhasil akan otomatis terkirim ke spreadsheet.</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={isSheetEnabled} 
+                        onChange={e => setIsSheetEnabledState(e.target.checked)} 
+                        className="sr-only peer" 
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-gray-600 block mb-1">URL Google Apps Script Web App</label>
+                    <input 
+                      type="url" 
+                      value={googleSheetUrl} 
+                      onChange={e => setGoogleSheetUrlState(e.target.value)} 
+                      placeholder="https://script.google.com/macros/s/.../exec" 
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs" 
+                    />
+                    <span className="text-[10px] text-gray-400 block mt-1">Masukkan URL Web App dari Apps Script Anda setelah dideploy.</span>
+                  </div>
+
+                  {/* Google Apps Script Guide Accordion */}
+                  <details className="bg-white p-3 rounded-xl border border-gray-150 text-xs">
+                    <summary className="font-semibold text-gray-700 cursor-pointer hover:text-pink-600 flex items-center gap-1">
+                      <HelpCircle className="w-3.5 h-3.5" /> Panduan & Kode Google Apps Script
+                    </summary>
+                    <div className="mt-3 space-y-2 text-gray-600 leading-relaxed text-[11px]">
+                      <ol className="list-decimal list-inside space-y-1">
+                        <li>Buat Spreadsheet Baru di Google Sheets.</li>
+                        <li>Buka menu <b>Extensions &gt; Apps Script</b> (Ekstensi &gt; Apps Script).</li>
+                        <li>Hapus seluruh kode bawaan di editor, lalu paste kode di bawah ini.</li>
+                        <li>Klik ikon <b>Save</b> (Simpan), lalu klik tombol <b>Deploy &gt; New Deployment</b> (Terapkan Baru).</li>
+                        <li>Pilih jenis deployment: <b>Web App</b> (Aplikasi Web).</li>
+                        <li>Ubah <i>Execute as</i> ke <b>Me</b> (Saya), dan <i>Who has access</i> ke <b>Anyone</b> (Siapa Saja).</li>
+                        <li>Klik <b>Deploy</b>, setujui izin akun Google Anda jika diminta, lalu salin <b>Web App URL</b> yang dihasilkan dan paste di atas.</li>
+                      </ol>
+
+                      <div className="mt-2 relative">
+                        <div className="flex justify-between items-center mb-1 bg-gray-100 p-1 rounded-t-lg">
+                          <span className="font-mono text-[10px] text-gray-500 pl-1">Code.gs (Apps Script)</span>
+                          <button 
+                            type="button" 
+                            onClick={() => {
+                              const scriptCode = `function doPost(e) {
+  try {
+    var jsonString = e.postData.contents;
+    var payload = JSON.parse(jsonString);
+    var action = payload.action;
+    
+    if (action === "test") {
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Koneksi Google Sheet Berhasil! 🌸" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheetName = payload.sheetName || "Sheet1";
+    var headers = payload.headers || [];
+    var targetSheet = ss.getSheetByName(sheetName);
+    
+    // Create sheet if not exists and append headers
+    if (!targetSheet) {
+      targetSheet = ss.insertSheet(sheetName);
+      if (headers.length > 0) {
+        targetSheet.appendRow(headers);
+        targetSheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#ffe4e1");
+        targetSheet.setFrozenRows(1);
+      }
+    }
+    
+    if (action === "sync_row") {
+      var rowData = payload.rowData || [];
+      var keyIndex = payload.keyIndex !== undefined ? payload.keyIndex : -1;
+      
+      if (keyIndex >= 0 && rowData.length > keyIndex) {
+        var dataRange = targetSheet.getDataRange();
+        var values = dataRange.getValues();
+        var duplicate = false;
+        var keyValue = rowData[keyIndex];
+        
+        for (var i = 1; i < values.length; i++) {
+          if (values[i][keyIndex] == keyValue) {
+            duplicate = true;
+            var row = i + 1;
+            targetSheet.getRange(row, 1, 1, rowData.length).setValues([rowData]);
+            break;
+          }
+        }
+        
+        if (!duplicate) {
+          targetSheet.appendRow(rowData);
+        }
+      } else {
+        targetSheet.appendRow(rowData);
+      }
+      
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Data baris berhasil disinkronkan ke sheet " + sheetName + "!" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    if (action === "sync_bulk") {
+      var rows = payload.rows || [];
+      targetSheet.clearContents();
+      
+      // Re-add headers
+      if (headers.length > 0) {
+        targetSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+        targetSheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#ffe4e1");
+      }
+      
+      // Write rows
+      if (rows.length > 0) {
+        targetSheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+      }
+      
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Data tabel " + sheetName + " berhasil diperbarui secara bulk!" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Aksi tidak dikenali." }))
+      .setMimeType(ContentService.MimeType.JSON);
+      
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doGet(e) {
+  return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Google Apps Script API Aktif! Gunakan metode POST." }))
+    .setMimeType(ContentService.MimeType.JSON);
+}`;
+                              navigator.clipboard.writeText(scriptCode);
+                              alert("Kode Google Apps Script berhasil disalin ke clipboard! 🌸");
+                            }}
+                            className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-2 py-0.5 rounded text-[9px] transition-colors"
+                          >
+                            Salin Kode Script 📋
+                          </button>
+                        </div>
+                        <pre className="bg-gray-800 text-pink-100 p-2.5 rounded-b-lg font-mono text-[9px] overflow-x-auto max-h-40 overflow-y-auto whitespace-pre select-all">
+{`function doPost(e) {
+  try {
+    var jsonString = e.postData.contents;
+    var payload = JSON.parse(jsonString);
+    var action = payload.action;
+    
+    if (action === "test") {
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Koneksi Google Sheet Berhasil! 🌸" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheetName = payload.sheetName || "Sheet1";
+    var headers = payload.headers || [];
+    var targetSheet = ss.getSheetByName(sheetName);
+    
+    // Create sheet if not exists and append headers
+    if (!targetSheet) {
+      targetSheet = ss.insertSheet(sheetName);
+      if (headers.length > 0) {
+        targetSheet.appendRow(headers);
+        targetSheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#ffe4e1");
+        targetSheet.setFrozenRows(1);
+      }
+    }
+    
+    if (action === "sync_row") {
+      var rowData = payload.rowData || [];
+      var keyIndex = payload.keyIndex !== undefined ? payload.keyIndex : -1;
+      
+      if (keyIndex >= 0 && rowData.length > keyIndex) {
+        var dataRange = targetSheet.getDataRange();
+        var values = dataRange.getValues();
+        var duplicate = false;
+        var keyValue = rowData[keyIndex];
+        
+        for (var i = 1; i < values.length; i++) {
+          if (values[i][keyIndex] == keyValue) {
+            duplicate = true;
+            var row = i + 1;
+            targetSheet.getRange(row, 1, 1, rowData.length).setValues([rowData]);
+            break;
+          }
+        }
+        
+        if (!duplicate) {
+          targetSheet.appendRow(rowData);
+        }
+      } else {
+        targetSheet.appendRow(rowData);
+      }
+      
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Data baris berhasil disinkronkan ke sheet " + sheetName + "!" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    if (action === "sync_bulk") {
+      var rows = payload.rows || [];
+      targetSheet.clearContents();
+      
+      // Re-add headers
+      if (headers.length > 0) {
+        targetSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+        targetSheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#ffe4e1");
+      }
+      
+      // Write rows
+      if (rows.length > 0) {
+        targetSheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+      }
+      
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Data tabel " + sheetName + " berhasil diperbarui secara bulk!" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Aksi tidak dikenali." }))
+      .setMimeType(ContentService.MimeType.JSON);
+      
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doGet(e) {
+  return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Google Apps Script API Aktif! Gunakan metode POST." }))
+    .setMimeType(ContentService.MimeType.JSON);
+}`}
+                        </pre>
+                      </div>
+                    </div>
+                  </details>
+
+                  {/* Actions Row */}
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <button 
+                        type="button" 
+                        onClick={handleTestSheetConnection} 
+                        disabled={isTestingConn}
+                        className="flex-1 bg-white hover:bg-gray-50 text-gray-700 font-semibold px-3 py-2 rounded-xl border border-gray-200 text-xs flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 text-pink-500 ${isTestingConn ? 'animate-spin' : ''}`} />
+                        {isTestingConn ? 'Menghubungi...' : 'Test Koneksi Sheet'}
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={handleManualSheetSync} 
+                        disabled={isSyncing}
+                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-3 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 text-white ${isSyncing ? 'animate-spin' : ''}`} />
+                        {isSyncing ? 'Menyinkronkan...' : 'Sinkronisasi Transaksi'}
+                      </button>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={handleSyncAllMasterData} 
+                      disabled={isSyncingAll}
+                      className="w-full bg-pink-600 hover:bg-pink-700 text-white font-semibold px-3 py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 text-white ${isSyncingAll ? 'animate-spin' : ''}`} />
+                      {isSyncingAll ? 'Menyinkronkan Semua Tabel...' : 'Sinkronisasi Semua Data Master & Laporan (Bulk)'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Google Sheet Sync Logs */}
+                {sheetLogs.length > 0 && (
+                  <div className="space-y-1.5 mt-3 pt-3 border-t border-pink-100">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                        <Clock className="w-3 h-3" /> Log Sinkronisasi Spreadsheet
+                      </span>
+                      <button 
+                        type="button" 
+                        onClick={handleClearSheetLogs}
+                        className="text-[10px] text-red-500 hover:text-red-700 font-medium flex items-center gap-0.5"
+                      >
+                        <Trash2 className="w-2.5 h-2.5" /> Bersihkan Log
+                      </button>
+                    </div>
+
+                    <div className="max-h-32 overflow-y-auto bg-gray-50 p-2 rounded-xl border border-gray-150 space-y-1.5">
+                      {sheetLogs.map((log: any, index: number) => (
+                        <div key={index} className="flex items-start justify-between text-[10px] border-b border-gray-200/50 pb-1.5 last:border-0 last:pb-0">
+                          <div className="space-y-0.5 max-w-[70%]">
+                            <span className="text-[9px] text-gray-400 block">{new Date(log.timestamp).toLocaleString('id-ID')}</span>
+                            <span className="font-bold text-gray-700">{log.action}</span>
+                            <span className="text-gray-500 block leading-normal">{log.message}</span>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <span className={`px-1.5 py-0.5 rounded-full font-bold text-[8px] uppercase tracking-wide inline-block ${
+                              log.status === 'Success' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                            }`}>
+                              {log.status}
+                            </span>
+                            {log.nota !== '-' && (
+                              <span className="font-mono text-gray-400 font-bold">{log.nota}</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <button type="submit" className="w-full bg-[#ff6699] hover:bg-[#ff3377] text-white py-3 rounded-xl font-medium shadow transition-colors">
@@ -3727,6 +5303,7 @@ export default function App() {
           </div>
         )}
 
+        </div>
       </div>
 
       {/* STRUK MODAL */}
