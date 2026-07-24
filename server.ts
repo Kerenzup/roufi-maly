@@ -20,6 +20,33 @@ app.use((req, res, next) => {
 
 const DB_FILE = path.join(process.cwd(), "db_store.json");
 
+// Helper to validate & diagnose Google Apps Script Web App URL format
+function validateGasUrlFormat(url: string): { valid: boolean; message?: string } {
+  const cleanUrl = (url || "").trim();
+  if (!cleanUrl) {
+    return { valid: false, message: "URL Google Sheets belum dikonfigurasi!" };
+  }
+  if (cleanUrl.includes("docs.google.com/spreadsheets/d/")) {
+    return {
+      valid: false,
+      message: "🛑 SALAH FORMAT URL: Anda memasukkan URL Spreadsheet Google Sheets, BUKAN Web App URL!\n\nSOLUSI:\n1. Buka Spreadsheet Anda > Extensions > Apps Script.\n2. Klik Deploy > New Deployment > Web App.\n3. Salin 'Web App URL' yang berakhiran '/exec'."
+    };
+  }
+  if (cleanUrl.endsWith("/dev")) {
+    return {
+      valid: false,
+      message: "🛑 SALAH FORMAT URL: URL berakhiran '/dev' hanya bisa diakses saat Anda login di browser pemilik.\n\nSOLUSI:\nGanti '/dev' di akhir URL menjadi '/exec', atau lakukan Deploy ulang sebagai Web App publik."
+    };
+  }
+  if (!cleanUrl.startsWith("https://script.google.com/macros/s/")) {
+    return {
+      valid: false,
+      message: "🛑 FORMAT URL TIDAK VALID: URL Google Apps Script Web App harus diawali dengan 'https://script.google.com/macros/s/' dan berakhiran '/exec'."
+    };
+  }
+  return { valid: true };
+}
+
 // Google Sheets Sync Helper Function
 async function syncEntityToSheet(entityName: string, payloadData?: any, bypassEnabledCheck = false) {
   if (!db.settings.googleSheetUrl) {
@@ -28,15 +55,19 @@ async function syncEntityToSheet(entityName: string, payloadData?: any, bypassEn
   if (!bypassEnabledCheck && !db.settings.isSheetEnabled) {
     return { success: false, message: "Sinkronisasi Google Sheets dinonaktifkan di pengaturan." };
   }
-  
+
+  const url = db.settings.googleSheetUrl.trim();
+  const urlCheck = validateGasUrlFormat(url);
+  if (!urlCheck.valid) {
+    return { success: false, message: urlCheck.message };
+  }
+
   let sheetName = "";
   let headers: string[] = [];
   let action = "sync_row";
   let keyIndex = 0;
   let rowData: any[] = [];
   let rows: any[][] = [];
-
-  const url = db.settings.googleSheetUrl.trim();
 
   switch (entityName) {
     case "transaksi":
@@ -298,10 +329,10 @@ const defaultDb = {
     alamatPo: "Jl. Pink Utama No. 88 Jakarta (Kantor Pusat)",
     theme: "sakura",
     tagline: "Fashion, Retail & Supply Chain Management",
-    logoUrl: "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=300",
+    logoUrl: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=300",
     pajakPersen: 11,
     diskonMemberPersen: 10,
-    footerStruk: "Terima kasih telah berbelanja di Pinky Shop 🌸",
+    footerStruk: "Terima kasih telah berbelanja di toko kami",
     googleSheetUrl: "",
     isSheetEnabled: false,
     rekeningOwner: [
@@ -371,7 +402,7 @@ const defaultDb = {
   googleSheetLogs: [] as any[]
 };
 
-let db = { ...defaultDb };
+let db: any = { ...defaultDb };
 
 function saveDatabase() {
   try {
@@ -410,12 +441,22 @@ function syncMasterBarang() {
         beli: b[3],
         hpp: b[4],
         jual: b[5],
-        foto: b[7]
+        foto: b[7],
+        satuan: b[9] || "Pcs"
       });
     }
   });
 
+  const activeBranchNames = db.cabang.map(c => c[1]);
   let modified = false;
+
+  // Filter out any products whose branch location is no longer in the list of active branches
+  const originalCount = db.barang.length;
+  db.barang = db.barang.filter((b: any) => activeBranchNames.includes(b[8]));
+  if (db.barang.length !== originalCount) {
+    modified = true;
+  }
+
   db.cabang.forEach((c) => {
     const branchName = c[1];
     masterMap.forEach((info, code) => {
@@ -430,9 +471,16 @@ function syncMasterBarang() {
           info.jual,
           10, // default stock for branch
           info.foto,
-          branchName
+          branchName,
+          info.satuan || "Pcs"
         ]);
         modified = true;
+      } else {
+        // Ensure existing products have a default unit if not set
+        if (exists[9] === undefined) {
+          exists[9] = info.satuan || "Pcs";
+          modified = true;
+        }
       }
     });
   });
@@ -494,6 +542,7 @@ app.post("/api/simpanKasHarian", async (req, res) => {
     cabang: cabang || "Cabang Pusat"
   };
   db.kasHarian.unshift(entry);
+  saveDatabase();
   await syncEntityToSheet("kasHarian");
   res.json({ s: 1, m: "Catatan kas harian berhasil disimpan!" });
 });
@@ -501,6 +550,7 @@ app.post("/api/simpanKasHarian", async (req, res) => {
 app.post("/api/hapusKasHarian", async (req, res) => {
   const { id } = req.body;
   db.kasHarian = db.kasHarian.filter(k => k.id !== id);
+  saveDatabase();
   await syncEntityToSheet("kasHarian");
   res.json({ s: 1, m: "Catatan kas harian berhasil dihapus." });
 });
@@ -511,36 +561,61 @@ app.get("/api/getSettings", (req, res) => {
 
 app.post("/api/updateSettings", (req, res) => {
   const { namaToko, alamat, alamatPo, tagline, theme, logoUrl, pajakPersen, diskonMemberPersen, footerStruk, rekeningOwner, branchOpExpenses, googleSheetUrl, isSheetEnabled } = req.body;
+  
   db.settings = {
-    namaToko: namaToko || db.settings.namaToko,
-    alamat: alamat || db.settings.alamat,
-    alamatPo: alamatPo !== undefined ? alamatPo : db.settings.alamatPo,
-    theme: theme || db.settings.theme,
-    tagline: tagline !== undefined ? tagline : db.settings.tagline,
-    logoUrl: logoUrl || db.settings.logoUrl,
-    pajakPersen: Number(pajakPersen) || 0,
-    diskonMemberPersen: Number(diskonMemberPersen) || 0,
-    footerStruk: footerStruk || db.settings.footerStruk,
-    rekeningOwner: rekeningOwner || db.settings.rekeningOwner,
-    branchOpExpenses: branchOpExpenses || db.settings.branchOpExpenses,
-    googleSheetUrl: googleSheetUrl !== undefined ? googleSheetUrl : (db.settings.googleSheetUrl || ""),
-    isSheetEnabled: isSheetEnabled !== undefined ? !!isSheetEnabled : !!db.settings.isSheetEnabled
+    ...db.settings,
+    ...(namaToko !== undefined && { namaToko }),
+    ...(alamat !== undefined && { alamat }),
+    ...(alamatPo !== undefined && { alamatPo }),
+    ...(tagline !== undefined && { tagline }),
+    ...(theme !== undefined && { theme }),
+    ...(logoUrl !== undefined && { logoUrl }),
+    ...(pajakPersen !== undefined && { pajakPersen: isNaN(Number(pajakPersen)) ? 0 : Number(pajakPersen) }),
+    ...(diskonMemberPersen !== undefined && { diskonMemberPersen: isNaN(Number(diskonMemberPersen)) ? 0 : Number(diskonMemberPersen) }),
+    ...(footerStruk !== undefined && { footerStruk }),
+    ...(rekeningOwner !== undefined && { rekeningOwner }),
+    ...(branchOpExpenses !== undefined && { branchOpExpenses }),
+    ...(googleSheetUrl !== undefined && { googleSheetUrl }),
+    ...(isSheetEnabled !== undefined && { isSheetEnabled: !!isSheetEnabled })
   };
-  res.json({ s: 1, m: "Pengaturan toko, rekening & biaya operasional per cabang berhasil diperbarui!" });
+  
+  saveDatabase();
+  res.json({ s: 1, m: "Pengaturan toko, rekening & biaya operasional per cabang berhasil disimpan secara permanen!", settings: db.settings });
 });
 
 app.post("/api/simpanUser", async (req, res) => {
-  const { email, sandi, nama, role, cabang } = req.body;
-  const existing = db.users.find(u => u.email === email);
+  const { email, sandi, nama, role, cabang, oldEmail, isOffline, komisiPersen, gajiPokok } = req.body;
+  
+  const targetEmail = oldEmail || email;
+  const existing = db.users.find(u => u.email === targetEmail);
+  
   if (existing) {
-    existing.sandi = sandi || existing.sandi;
+    if (email && email !== targetEmail) {
+      existing.email = email;
+    }
+    existing.sandi = sandi || existing.sandi || "123456";
     existing.nama = nama || existing.nama;
     existing.role = role || existing.role;
     existing.cabang = cabang || existing.cabang;
+    if (isOffline !== undefined) existing.isOffline = !!isOffline;
+    if (komisiPersen !== undefined) existing.komisiPersen = Number(komisiPersen);
+    if (gajiPokok !== undefined) existing.gajiPokok = Number(gajiPokok);
+    
+    saveDatabase();
     await syncEntityToSheet("users");
     res.json({ s: 1, m: "Data staff berhasil diperbarui!" });
   } else {
-    db.users.push({ email, sandi: sandi || "123456", nama: nama || "Staff Baru", role: role || "Kasir", cabang: cabang || "Cabang Pusat", komisiPersen: 5 });
+    db.users.push({
+      email,
+      sandi: sandi || "123456",
+      nama: nama || "Staff Baru",
+      role: role || "Kasir",
+      cabang: cabang || "Cabang Pusat",
+      komisiPersen: komisiPersen !== undefined ? Number(komisiPersen) : 5,
+      isOffline: !!isOffline,
+      gajiPokok: gajiPokok !== undefined ? Number(gajiPokok) : 2500000
+    });
+    saveDatabase();
     await syncEntityToSheet("users");
     res.json({ s: 1, m: "Staff baru berhasil ditambahkan!" });
   }
@@ -549,12 +624,13 @@ app.post("/api/simpanUser", async (req, res) => {
 app.post("/api/hapusUser", async (req, res) => {
   const { email } = req.body;
   db.users = db.users.filter(u => u.email !== email);
+  saveDatabase();
   await syncEntityToSheet("users");
   res.json({ s: 1, m: "Staff berhasil dihapus dari sistem." });
 });
 
 app.post("/api/simpanBarang", async (req, res) => {
-  const { kode, nama, beli, hpp, jual, stok, foto, cabang, oldKode, branchStokMap, branchHppMap } = req.body;
+  const { kode, nama, beli, hpp, jual, stok, foto, cabang, oldKode, branchStokMap, branchHppMap, satuan } = req.body;
   const baseKode = kode || `BRG${Date.now().toString().slice(-4)}`;
 
   if (oldKode && oldKode !== baseKode) {
@@ -580,6 +656,7 @@ app.post("/api/simpanBarang", async (req, res) => {
       existing[5] = Number(jual) || existing[5];
       existing[6] = branchStokVal;
       existing[7] = foto || existing[7];
+      existing[9] = satuan || existing[9] || "Pcs";
     } else {
       db.barang.push([
         db.barang.length + 1,
@@ -590,7 +667,8 @@ app.post("/api/simpanBarang", async (req, res) => {
         Number(jual) || 0,
         branchStokVal,
         foto || "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=150",
-        branchName
+        branchName,
+        satuan || "Pcs"
       ]);
     }
   });
@@ -611,21 +689,169 @@ app.post("/api/simpanCabang", async (req, res) => {
   if (oldId) {
     const idx = db.cabang.findIndex(c => c[0] === oldId);
     if (idx !== -1) {
+      const oldNama = db.cabang[idx][1];
       db.cabang[idx] = [id || oldId, nama, alamat];
+      
+      if (oldNama !== nama) {
+        // Update all related branch name references
+        db.barang.forEach((b: any) => {
+          if (b[8] === oldNama) b[8] = nama;
+        });
+        db.users.forEach((u: any) => {
+          if (u.cabang === oldNama) u.cabang = nama;
+        });
+        db.transaksi.forEach((t: any) => {
+          if (t[4] === oldNama) t[4] = nama;
+        });
+        db.opname.forEach((op: any) => {
+          if (op.cabang === oldNama) op.cabang = nama;
+        });
+        db.transfer.forEach((tr: any) => {
+          if (tr.dariCabang === oldNama) tr.dariCabang = nama;
+          if (tr.keCabang === oldNama) tr.keCabang = nama;
+        });
+        db.purchaseOrders.forEach((po: any) => {
+          if (po.cabang === oldNama) po.cabang = nama;
+        });
+        db.payroll.forEach((pay: any) => {
+          if (pay.cabang === oldNama) pay.cabang = nama;
+        });
+        db.production.forEach((prod: any) => {
+          if (prod.cabang === oldNama) prod.cabang = nama;
+        });
+        db.kasHarian.forEach((k: any) => {
+          if (k.cabang === oldNama) k.cabang = nama;
+        });
+        db.ledger.forEach((ld: any) => {
+          if (ld.cabang === oldNama) ld.cabang = nama;
+        });
+
+        // Update operational expenses settings key
+        if (db.settings.branchOpExpenses && db.settings.branchOpExpenses[oldNama]) {
+          db.settings.branchOpExpenses[nama] = db.settings.branchOpExpenses[oldNama];
+          delete db.settings.branchOpExpenses[oldNama];
+        }
+      }
+
+      saveDatabase();
       await syncEntityToSheet("cabang");
+      if (oldNama !== nama) {
+        await syncEntityToSheet("barang");
+        await syncEntityToSheet("users");
+        await syncEntityToSheet("transaksi");
+        await syncEntityToSheet("kasHarian");
+        await syncEntityToSheet("ledger");
+        await syncEntityToSheet("opname");
+        await syncEntityToSheet("purchaseOrders");
+      }
       res.json({ s: 1, m: "Data cabang berhasil diperbarui!" });
       return;
     }
   }
+  
+  // Registering new branch
   db.cabang.push([id || `CBR${db.cabang.length + 1}`, nama, alamat]);
+  
+  // Initialize existing products for the new branch with 0 stock
+  const uniqueProductKodes = Array.from(new Set(db.barang.map((b: any) => b[1])));
+  uniqueProductKodes.forEach(kode => {
+    const sample = db.barang.find((b: any) => b[1] === kode);
+    if (sample) {
+      const existing = db.barang.find((b: any) => b[1] === kode && b[8] === nama);
+      if (!existing) {
+        db.barang.push([
+          db.barang.length + 1,
+          kode,
+          sample[2] || "Produk Baru",
+          sample[3] || 0,
+          sample[4] || 0, // HPP
+          sample[5] || 0, // Jual
+          0, // Default stock for new branch is 0
+          sample[7] || "",
+          nama,
+          sample[9] || "Pcs"
+        ]);
+      }
+    }
+  });
+
+  // Initialize branch operational expenses for the new branch
+  if (!db.settings.branchOpExpenses) db.settings.branchOpExpenses = {};
+  if (!db.settings.branchOpExpenses[nama]) {
+    db.settings.branchOpExpenses[nama] = { sewa: 5000000, listrik: 1500000, air: 300000, gaji: 15000000, telepon: 500000, transport: 1000000, csr: 500000 };
+  }
+
+  saveDatabase();
   await syncEntityToSheet("cabang");
+  await syncEntityToSheet("barang");
   res.json({ s: 1, m: "Cabang baru berhasil didaftarkan!" });
 });
 
 app.post("/api/hapusCabang", async (req, res) => {
   const { id } = req.body;
+  const targetCabang = db.cabang.find(c => c[0] === id);
+  if (!targetCabang) {
+    res.json({ s: 0, m: "Cabang tidak ditemukan." });
+    return;
+  }
+  const branchName = targetCabang[1];
+
+  // 1. Remove branch
   db.cabang = db.cabang.filter(c => c[0] !== id);
+
+  // Determine fallback branch
+  const remainingBranches = db.cabang.map(c => c[1]);
+  const fallbackBranch = remainingBranches.length > 0 ? remainingBranches[0] : "Cabang Pusat";
+
+  // 2. Reassign any product that ONLY exists under the deleted branch so they are NOT lost!
+  db.barang.forEach((b: any) => {
+    if (b[8] === branchName) {
+      // Check if this product code exists in any other remaining branch
+      const hasOther = db.barang.some((other: any) => other[1] === b[1] && other[8] !== branchName && remainingBranches.includes(other[8]));
+      if (!hasOther && remainingBranches.length > 0) {
+        // Change its branch to fallback branch to preserve the product definition!
+        b[8] = fallbackBranch;
+      }
+    }
+  });
+
+  // Now, safely filter out any remaining products that are still mapped to the deleted branch
+  db.barang = db.barang.filter((b: any) => b[8] !== branchName);
+
+  // 3. Reassign users assigned to this branch
+  db.users.forEach((u: any) => {
+    if (u.cabang === branchName) {
+      u.cabang = fallbackBranch;
+    }
+  });
+
+  // Reassign payroll records assigned to this branch so historical database records stay valid
+  db.payroll.forEach((p: any) => {
+    if (p.cabang === branchName) {
+      p.cabang = fallbackBranch;
+    }
+  });
+
+  // Reassign ledger and kasHarian records assigned to this branch
+  db.ledger.forEach((l: any) => {
+    if (l.cabang === branchName) {
+      l.cabang = fallbackBranch;
+    }
+  });
+  db.kasHarian.forEach((k: any) => {
+    if (k.cabang === branchName) {
+      k.cabang = fallbackBranch;
+    }
+  });
+
+  saveDatabase();
   await syncEntityToSheet("cabang");
+  await syncEntityToSheet("barang");
+  await syncEntityToSheet("users");
+  await syncEntityToSheet("payroll");
+  await syncEntityToSheet("ledger");
+  await syncEntityToSheet("kasHarian");
+
   res.json({ s: 1, m: "Cabang berhasil dihapus." });
 });
 
@@ -697,13 +923,15 @@ app.post("/api/simpanTransaksi", async (req, res) => {
 app.post("/api/syncSheetsTest", async (req, res) => {
   const { url } = req.body;
   const testUrl = (url || db.settings.googleSheetUrl || "").trim();
-  if (!testUrl) {
-    return res.json({ s: 0, m: "URL Google Sheets belum diatur!" });
+  
+  const urlValidation = validateGasUrlFormat(testUrl);
+  if (!urlValidation.valid) {
+    return res.json({ s: 0, m: urlValidation.message });
   }
 
   try {
     const controller = new AbortController();
-    const idTimeout = setTimeout(() => controller.abort(), 10000); // 10 seconds timeout
+    const idTimeout = setTimeout(() => controller.abort(), 12000); // 12 seconds timeout
 
     const response = await fetch(testUrl, {
       method: "POST",
@@ -715,6 +943,9 @@ app.post("/api/syncSheetsTest", async (req, res) => {
     clearTimeout(idTimeout);
 
     if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        throw new Error("HTTP " + response.status + ": Akses ditolak oleh Google. Setelan 'Who has access' di Apps Script wajib diubah ke 'Anyone' (Siapa saja).");
+      }
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
@@ -724,7 +955,16 @@ app.post("/api/syncSheetsTest", async (req, res) => {
       data = JSON.parse(responseText);
     } catch (e) {
       if (responseText.includes("<!DOCTYPE") || responseText.includes("<html") || responseText.includes("<script") || responseText.includes("Google Accounts")) {
-        throw new Error("Apps Script mengembalikan halaman HTML/Login. Ini karena setelan deployment 'Who has access' Anda belum diatur ke 'Anyone' (Siapa saja) di Google Apps Script, atau Anda belum menyetujui izin otorisasi akun Google.");
+        throw new Error(
+          "🔒 HASIL DIAGNOSTIK KONEKSI (BEDA PERUSAHAAN):\n" +
+          "Google Apps Script mengembalikan halaman Login HTML. Ini menandakan setelan 'Who has access' Anda masih terbatas pada internal organisasi saja.\n\n" +
+          "SOLUSI SUPAYA LINK BISA DIBAGIKAN KE BEDA PERUSAHAAN:\n" +
+          "1. Buka editor Google Apps Script > Deploy > Manage deployments.\n" +
+          "2. Edit deployment aktif Anda (tombol ikon pensil).\n" +
+          "3. Ubah 'Execute as' -> 'Me' (Pemilik Akun).\n" +
+          "4. Ubah 'Who has access' -> 'Anyone' (Siapa Saja - bahkan tanpa akun Google).\n" +
+          "5. Jika akun Google Perusahaan (Workspace) membatasi opsi 'Anyone', buatlah Spreadsheet di akun @gmail.com pribadi agar Web App dapat dihubungi dari semua perusahaan/cabang!"
+        );
       }
       throw new Error(`Format respon salah (Bukan JSON): ${responseText.slice(0, 100)}...`);
     }
@@ -737,7 +977,7 @@ app.post("/api/syncSheetsTest", async (req, res) => {
         nota: "-",
         message: data.message || "Koneksi Berhasil"
       });
-      res.json({ s: 1, m: "Koneksi Google Sheet Berhasil! 🌸", logs: db.googleSheetLogs });
+      res.json({ s: 1, m: "Koneksi Google Sheet Berhasil! 🌸 Web App siap menerima data dari semua perusahaan/cabang.", logs: db.googleSheetLogs });
     } else {
       db.googleSheetLogs.unshift({
         timestamp: Date.now(),
@@ -756,7 +996,7 @@ app.post("/api/syncSheetsTest", async (req, res) => {
       nota: "-",
       message: err.message || "Network error"
     });
-    res.json({ s: 0, m: `Error koneksi: ${err.message || "Timeout / Tidak dapat terhubung ke Google Sheets"}`, logs: db.googleSheetLogs });
+    res.json({ s: 0, m: err.message || "Timeout / Tidak dapat terhubung ke Google Sheets", logs: db.googleSheetLogs });
   }
 });
 
@@ -870,6 +1110,7 @@ app.post("/api/simpanOpname", async (req, res) => {
 
   await syncEntityToSheet("opname");
   await syncEntityToSheet("barang");
+  saveDatabase();
 
   res.json({ s: 1, m: "Stok Opname berhasil dikirim & stok disesuaikan!" });
 });
@@ -895,6 +1136,7 @@ app.post("/api/buatTransfer", async (req, res) => {
     catatan: catatan || "-"
   });
 
+  saveDatabase();
   await syncEntityToSheet("transfer");
 
   res.json({ s: 1, m: "Permintaan transfer barang berhasil dikirim ke Pusat untuk approval!" });
@@ -955,6 +1197,7 @@ app.post("/api/prosesTransfer", async (req, res) => {
     }
   }
 
+  saveDatabase();
   await syncEntityToSheet("transfer");
   await syncEntityToSheet("barang");
 
@@ -987,6 +1230,7 @@ app.post("/api/buatPO", async (req, res) => {
     referensi: id
   });
 
+  saveDatabase();
   await syncEntityToSheet("purchaseOrders");
   await syncEntityToSheet("ledger");
 
@@ -998,9 +1242,11 @@ app.post("/api/prosesPO", async (req, res) => {
   const po = db.purchaseOrders.find((p: any) => p.id === id);
   if (!po) return res.json({ s: 0, m: "Purchase Order tidak ditemukan." });
 
+  const prevStatus = po.status;
   po.status = status;
-  if (status === 'Received') {
-    // Add stock to branch
+
+  if ((status === 'Received' || status === 'Paid') && !po.isStockAdded) {
+    // Add stock to branch if not already added
     po.items.forEach((item: any) => {
       let b = db.barang.find((x: any) => x[1] === item.kode && x[8] === po.cabang);
       if (b) {
@@ -1019,35 +1265,95 @@ app.post("/api/prosesPO", async (req, res) => {
         ]);
       }
     });
+    po.isStockAdded = true;
 
     db.ledger.unshift({
       id: "LED-" + Date.now().toString().slice(-5),
       tanggal: Date.now(),
       akun: "Persediaan Barang Masuk (Inventory Asset)",
       tipe: "Debet",
-      jumlah: po.total,
+      jumlah: Number(po.total) || 0,
       cabang: po.cabang,
       referensi: id
     });
   }
 
+  if (status === 'Paid' && prevStatus !== 'Paid') {
+    // Record Ledger Debet to clear Accounts Payable liability
+    db.ledger.unshift({
+      id: "LED-" + Date.now().toString().slice(-5),
+      tanggal: Date.now(),
+      akun: "Hutang Usaha / Pembelian (Accounts Payable)",
+      tipe: "Debet",
+      jumlah: Number(po.total) || 0,
+      cabang: po.cabang,
+      referensi: id
+    });
+
+    // Record Ledger Kredit for Cash Outflow
+    db.ledger.unshift({
+      id: "LED-" + (Date.now() + 1).toString().slice(-5),
+      tanggal: Date.now(),
+      akun: "Kas / QRIS Asset",
+      tipe: "Kredit",
+      jumlah: Number(po.total) || 0,
+      cabang: po.cabang,
+      referensi: id
+    });
+
+    // Record Kas Harian Pengeluaran (Kredit) for Supplier Payment
+    db.kasHarian.unshift({
+      id: `KAS-${Date.now().toString().slice(-4)}`,
+      tanggal: Date.now(),
+      keterangan: `Pelunasan Pembayaran Supplier ${po.supplier} (${po.id})`,
+      tipe: "Kredit",
+      jumlah: Number(po.total) || 0,
+      cabang: po.cabang || "Cabang Pusat"
+    });
+  }
+
+  saveDatabase();
   await syncEntityToSheet("purchaseOrders");
   await syncEntityToSheet("ledger");
+  await syncEntityToSheet("kasHarian");
   await syncEntityToSheet("barang");
 
-  res.json({ s: 1, m: `Purchase Order ${id} berhasil diperbarui statusnya menjadi ${status} & stok otomatis diperbarui!` });
+  let statusMsg = status === 'Paid' ? 'Lunas / Tagihan Selesai & Laporan Keuangan Terupdate' : status === 'Received' ? 'Diterima Gudang & Stok Bertambah' : 'Dibatalkan';
+  res.json({ s: 1, m: `Purchase Order ${id} berhasil diperbarui menjadi [${statusMsg}]!` });
 });
 
 // ERP HR & Payroll Management
 app.post("/api/updateUserCommission", async (req, res) => {
-  const { email, komisiPersen } = req.body;
+  const { email, komisiPersen, gajiPokok } = req.body;
   const targetUser = db.users.find((u: any) => u.email === email);
   if (!targetUser) return res.json({ s: 0, m: "Pegawai tidak ditemukan." });
-  targetUser.komisiPersen = Number(komisiPersen) || 0;
+  if (komisiPersen !== undefined) targetUser.komisiPersen = Number(komisiPersen) || 0;
+  if (gajiPokok !== undefined) targetUser.gajiPokok = Number(gajiPokok) || 0;
 
+  saveDatabase();
   await syncEntityToSheet("users");
 
-  res.json({ s: 1, m: `Persentase komisi untuk ${targetUser.nama} berhasil diatur menjadi ${targetUser.komisiPersen}% oleh Owner!` });
+  res.json({ s: 1, m: `Pengaturan komisi & gaji untuk ${targetUser.nama} berhasil diperbarui!` });
+});
+
+app.post("/api/updateBatchCommissions", async (req, res) => {
+  const { updates } = req.body; // Array of { email, komisiPersen, gajiPokok }
+  if (!Array.isArray(updates)) return res.json({ s: 0, m: "Data pembaruan tidak valid." });
+
+  let updatedCount = 0;
+  updates.forEach((item: any) => {
+    const targetUser = db.users.find((u: any) => u.email === item.email);
+    if (targetUser) {
+      if (item.komisiPersen !== undefined) targetUser.komisiPersen = Number(item.komisiPersen) || 0;
+      if (item.gajiPokok !== undefined) targetUser.gajiPokok = Number(item.gajiPokok) || 0;
+      updatedCount++;
+    }
+  });
+
+  saveDatabase();
+  await syncEntityToSheet("users");
+
+  res.json({ s: 1, m: `Berhasil memperbarui pengaturan komisi & gaji untuk ${updatedCount} staf!` });
 });
 
 app.post("/api/buatPayroll", async (req, res) => {
@@ -1079,6 +1385,7 @@ app.post("/api/buatPayroll", async (req, res) => {
     referensi: id
   });
 
+  saveDatabase();
   await syncEntityToSheet("payroll");
   await syncEntityToSheet("ledger");
 
@@ -1087,9 +1394,10 @@ app.post("/api/buatPayroll", async (req, res) => {
 
 // ERP Manufacturing / Production (Bill of Materials)
 app.post("/api/buatProduksi", async (req, res) => {
-  const { produk, qtyProduksi, bahanBaku, qtyBahan, pic } = req.body;
+  const { produk, qtyProduksi, bahanBaku, qtyBahan, pic, cabang } = req.body;
   if (!produk || !qtyProduksi) return res.json({ s: 0, m: "Data produksi tidak lengkap!" });
   const id = "PRD-" + Math.floor(100 + Math.random() * 900);
+  const targetCabang = cabang || (db.cabang[0] ? db.cabang[0][1] : "Cabang Utama");
   
   db.production.unshift({
     id,
@@ -1099,19 +1407,109 @@ app.post("/api/buatProduksi", async (req, res) => {
     bahanBaku: bahanBaku || "Kain / Bahan Baku Utama",
     qtyBahan: qtyBahan || "Standar",
     status: "Completed",
-    pic: pic || "Supervisor Produksi"
+    pic: pic || "Supervisor Produksi",
+    cabang: targetCabang
   });
 
-  // Add finished goods to Cabang Pusat
-  let b = db.barang.find((x: any) => x[2] === produk && x[8] === "Cabang Pusat");
+  // Add finished goods to target branch
+  let b = db.barang.find((x: any) => x[2] === produk && x[8] === targetCabang);
+  if (!b) {
+    b = db.barang.find((x: any) => x[2] === produk);
+  }
   if (b) {
     b[6] = Number(b[6]) + Number(qtyProduksi);
   }
 
+  saveDatabase();
   await syncEntityToSheet("production");
   await syncEntityToSheet("barang");
 
-  res.json({ s: 1, m: `Work Order Produksi ${id} selesai! ${qtyProduksi} pcs ${produk} telah ditambahkan ke stok Cabang Pusat.` });
+  res.json({ s: 1, m: `Work Order Produksi ${id} selesai! ${qtyProduksi} pcs ${produk} telah ditambahkan ke stok ${targetCabang}.` });
+});
+
+// Go-Live Initialization & Real Cash Setup
+app.post("/api/initGoLive", async (req, res) => {
+  try {
+    const { initialBalances, clearTransactions, clearKas, clearStock, clearPoAndTransfer } = req.body || {};
+
+    if (clearTransactions) {
+      db.transaksi = [];
+    }
+
+    if (clearPoAndTransfer) {
+      db.purchaseOrders = [];
+      db.transfer = [];
+      db.opname = [];
+      db.production = [];
+      db.payroll = [];
+    }
+
+    if (clearKas) {
+      db.kasHarian = [];
+      db.ledger = [];
+    }
+
+    // Set initial cash balances per branch
+    if (initialBalances && typeof initialBalances === "object") {
+      Object.keys(initialBalances).forEach((cabangName) => {
+        const amount = Number(initialBalances[cabangName]) || 0;
+        db.kasHarian.unshift({
+          id: `KAS-GO-${Date.now().toString().slice(-4)}-${Math.floor(Math.random() * 100)}`,
+          tanggal: Date.now(),
+          keterangan: `[GO-LIVE] Saldo Awal Kas Real - ${cabangName}`,
+          tipe: "Debet",
+          jumlah: amount,
+          cabang: cabangName
+        });
+
+        db.ledger.unshift({
+          id: `LED-GO-${Date.now().toString().slice(-4)}-${Math.floor(Math.random() * 100)}`,
+          tanggal: Date.now(),
+          akun: "Saldo Awal Modal Kas",
+          tipe: "Debet",
+          jumlah: amount,
+          cabang: cabangName,
+          referensi: "GO-LIVE-INIT"
+        });
+      });
+    }
+
+    if (clearStock) {
+      db.barang.forEach((b: any) => {
+        if (Array.isArray(b)) {
+          b[6] = 0; // set stock to 0
+        }
+      });
+    }
+
+    saveDatabase();
+
+    try {
+      await syncEntityToSheet("kasHarian");
+      await syncEntityToSheet("ledger");
+      await syncEntityToSheet("transaksi");
+      await syncEntityToSheet("barang");
+    } catch (syncErr) {
+      console.warn("Sheet sync warning during go-live:", syncErr);
+    }
+
+    res.json({
+      s: 1,
+      m: "Aplikasi berhasil dipersiapkan untuk Go-Live Real! Data simulasi telah disesuaikan & Saldo Awal Kas Real telah berhasil dipasang per cabang.",
+      kasHarian: db.kasHarian || [],
+      transaksi: db.transaksi || [],
+      barang: db.barang || [],
+      ledger: db.ledger || [],
+      purchaseOrders: db.purchaseOrders || [],
+      opname: db.opname || [],
+      transfer: db.transfer || [],
+      production: db.production || [],
+      payroll: db.payroll || []
+    });
+  } catch (err: any) {
+    console.error("Error in initGoLive:", err);
+    res.status(500).json({ s: 0, m: err?.message || "Terjadi kesalahan server saat Inisialisasi Go-Live" });
+  }
 });
 
 async function startServer() {
